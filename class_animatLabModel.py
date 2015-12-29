@@ -32,6 +32,8 @@ class AnimatLabModelError(Exception):
         Set the value of the error message.
         """
         self.value = value
+        
+        return True
     
     def __str__(self):
         """
