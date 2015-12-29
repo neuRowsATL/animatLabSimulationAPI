@@ -33,7 +33,11 @@ class AnimatLabModelError(Exception):
         """
         self.value = value
         
+<<<<<<< HEAD
         return 0
+=======
+        return True
+>>>>>>> 4f81caf1952a7be8c9f603bf96d0313c0def8270
     
     def __str__(self):
         """
