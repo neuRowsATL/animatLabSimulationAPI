@@ -3,7 +3,6 @@ Created by:     Bryce Chung (neuRowsATL)
 Last Modified:  December 28, 2015
 
 Description: This class opens and saves AnimatLab models from .aproj files.
-This is an extension to the initial comment.
 """
 
 # Import dependencies
@@ -33,6 +32,7 @@ class AnimatLabModelError(Exception):
         Set the value of the error message.
         """
         self.value = value
+        return True
     def __str__(self):
         """
         __str__()
