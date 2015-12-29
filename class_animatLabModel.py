@@ -14,7 +14,7 @@ import xml.etree.ElementTree as elementTree
 from PyDSTool import args
 
 # NEED TO REMOVE PYDSTOOL DEPENDENCIES
-from PyDSTool import args, copy
+from PyDSTool import args
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
