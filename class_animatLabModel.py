@@ -12,7 +12,7 @@ import numpy as np
 import xml.etree.ElementTree as elementTree
 
 # NEED TO REMOVE PYDSTOOL DEPENDENCIES
-from PyDSTool import args
+from PyDSTool import args, copy
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
