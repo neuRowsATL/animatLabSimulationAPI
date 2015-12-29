@@ -5,6 +5,7 @@ Last Modified:  December 28, 2015
 Description: This class opens and saves AnimatLab models from .aproj files.
 """
 
+# Import dependencies
 import os, glob
 import numpy as np
 
@@ -12,14 +13,32 @@ import xml.etree.ElementTree as elementTree
 
 from PyDSTool import args
 
+# NEED TO REMOVE PYDSTOOL DEPENDENCIES
+from PyDSTool import args, copy
+
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
 
 
 class AnimatLabModelError(Exception):
+    """
+    This class manages errors thrown by the AnimatLabModel class.
+    Right now, this class does nothing other than print an error message.
+    
+    Last updated:   December 28, 2015
+    Modified by:    Bryce Chung
+    """
     def __init__(self, value):
+        """
+        __init__(value)
+        Set the value of the error message.
+        """
         self.value = value
     def __str__(self):
+        """
+        __str__()
+        Returns the error message.
+        """
         return repr(self.value)
 
 
@@ -29,12 +48,43 @@ class AnimatLabModelError(Exception):
 
 class AnimatLabModel(object):
     """
-    Manages model resources including:
-    - AnimatLab model resource folder
-    - ASIM file(s)
-    - Model parameters for nodes, connections, stimuli, etc.
+    AnimatLabModel(folder='', asimFile='')
+    API class that uploads, saves, and manages an AnimatLab simulation file. Using
+    this class, you can load a simulation file and view its parameters, change its
+    parameters, or use it to generate and save a new simulation file with different
+    parameters.
+    
+    folder          Specifies folder for AnimatLab project files
+    asimFile        Specifies .asim file for AnimatLab model
+    
+    get_aproj()                Get .aproj file path string
+    get_asim()                 Get .asim file path string
+    get_xmlRoot()              Get root XML element from parsed .asim file
+    set_aproj(filePath)        Set path string for .aproj file
+    set_asim(filePath)         Set path string for .asim file
+    getElementByType(elType)   Get element(s) by AnimatLab type
+    getElementByName(elName)   Get element(s) by AnimatLab name
+    getElementByID(elID)       Get element by AnimatLab ID
     """
-    def __init__(self, folder='', asimFile=''):        
+    def __init__(self, folder='', asimFile=''):
+        """
+        __init__(folder='', asimFile='')
+        Initializes an AnimatLabModel class object.
+        
+        folder      Specifies full folder path for AnimatLab project files
+        asimFile    Specifies full .asim file path for AnimatLab model
+        
+        If no folder is specified, the object will default to the current working
+        directory.
+        
+        If no asimFile is specified, the object will search for an .asim file in the
+        model folder with the character string, "_Standalone". If no file exists as
+        "*_Standalone.asim" then the object will look for any file with the .asim
+        extension.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
+        """
         
         ## Set root folder for AnimatLab model resource files
         if folder == '':
@@ -121,49 +171,88 @@ class AnimatLabModel(object):
         
     ## GET functions
     def get_aproj(self):
+        """
+        get_aproj()
+        Returns a character string of the .aproj file.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
+        """
         return self.aprojFile
     
     def get_asim(self):
+        """
+        get_asim()
+        Returns a character string of the .asim file.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
+        """
         return self.asimFile
     
     
     def get_xml(self):
+        """
+        get_xml()
+        Returns an XML root element for the XML tree.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
+        """
         return self.tree.getroot()
     
     
     ## SET functions
     def set_aproj(self, filePath):
+        """
+        set_aproj(filePath)
+        Sets the full file path string for the .aproj file.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
+        """
         self.aprojFile = filePath
     
     
     def set_asim(self, filePath):
-        self.asimFile = filePath
-    
-    
-    def set_xml(self, xmlSource):
         """
-        Returns an XML Tree root element
+        set_asim(filePath)
+        Sets the full file path string for the .asim file.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung <bchung4@student.gsu.edu>
         """
-        if os.path.isfile(self.asimFile):
+        if os.path.isfile(filePath):
+            self.asimFile = filePath
             self.tree = elementTree.parse(self.asimFile)
             root = self.tree.getroot()
         else:
             raise AnimatLabModelError("No ASIM file specified for AnimatLab Model object.")
-        
     
     def getElementByType(self, elType):
         """
-        Find an element in the AnimatLab model by type:
-        - Neurons
-        - ExternalStimuli
-        - Adapters
+        getElementByType(elType)
+        Returns an array of XML elements with the type, elType
         
-        Returns a list of XML Tree elements.
+        elType          Options: "Neurons", "ExternalStimuli", "Adapters"
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung
         """
         return np.array(self.lookup.Element)[np.where(np.array(self.lookup.Type) == elType)[0]]
                 
                 
     def getElementByName(self, elName):
+        """
+        getElementByName(elName)
+        Returns an XML element with the specified name, elName
+        
+        elName          AnimatLab name of the desired element
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung
+        """
+        
         matches = np.array(self.lookup.Element)[np.where(np.array(self.lookup.Name) == elName)[0]]
         if len(matches) > 1:
             print "WARNING: More than one element with name found!!\n\n %i instance(s) with name %s" % (len(matches), elName)
@@ -176,6 +265,15 @@ class AnimatLabModel(object):
     
     
     def getElementByID(self, elID):
+        """
+        getElementByID(elID)
+        Returns an XML element by the AnimatLab ID
+        
+        elID            Specifies the AnimatLab ID of the desired element
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung
+        """
         matches = np.array(self.lookup.Element)[np.where(np.array(self.lookup.ID) == elID)[0]]
         if len(matches) > 1:
             print "WARNING: More than one element with ID found!!\n\n %i instance(s) with ID %s" % (len(matches, elID))
@@ -188,6 +286,18 @@ class AnimatLabModel(object):
         
         
     def saveXML(self, fileName = '', overwrite=False):
+        """
+        saveXML(fileName='', overwrite=False)
+        Saves the current AnimatLabModel object as a .asim file with the path name, fileName.
+        
+        fileName        Specifies the name of the .asim file.
+        overwrite       Boolean flag to overwrite an existing .asim file.
+        
+        The default file path is the project folder of the AnimatLabModel instantiation.
+        
+        Last updated:   December 28, 2015
+        Modified by:    Bryce Chung
+        """
         if fileName == '':
             if overwrite:
                 fileName = self.asimFile
