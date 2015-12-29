@@ -167,8 +167,6 @@ class AnimatLabModel(object):
         self.lookup.Name = lookupName
         self.lookup.Element = lookupElement
         
-        return True
-        
         
     ## GET functions
     def get_aproj(self):
