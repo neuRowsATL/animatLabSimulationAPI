@@ -3,6 +3,7 @@ Created by:     Bryce Chung (neuRowsATL)
 Last Modified:  December 28, 2015
 
 Description: This class opens and saves AnimatLab models from .aproj files.
+This is an extension to the initial comment.
 """
 
 # Import dependencies
