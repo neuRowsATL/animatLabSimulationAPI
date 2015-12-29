@@ -12,7 +12,7 @@ import numpy as np
 import xml.etree.ElementTree as elementTree
 
 # NEED TO REMOVE PYDSTOOL DEPENDENCIES
-from PyDSTool import args, copy
+from PyDSTool import args
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
@@ -33,12 +33,6 @@ class AnimatLabModelError(Exception):
         """
         self.value = value
         
-<<<<<<< HEAD
-        return 0
-=======
-        return True
->>>>>>> 4f81caf1952a7be8c9f603bf96d0313c0def8270
-    
     def __str__(self):
         """
         __str__()
