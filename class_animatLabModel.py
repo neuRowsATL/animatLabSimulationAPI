@@ -10,7 +10,7 @@ import numpy as np
 
 import xml.etree.ElementTree as elementTree
 
-from PyDSTool import args, copy
+from PyDSTool import args
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
