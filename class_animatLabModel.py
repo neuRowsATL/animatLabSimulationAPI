@@ -33,7 +33,7 @@ class AnimatLabModelError(Exception):
         """
         self.value = value
         
-        return False
+        return True
     
     def __str__(self):
         """
