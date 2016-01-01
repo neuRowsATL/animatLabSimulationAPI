@@ -10,4 +10,4 @@ import class_animatLabModel as AnimatLabModel
 global verbose
 verbose = 3
 
-model = AnimatLabModel("F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/")
+model = AnimatLabModel.AnimatLabModel("F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/")
