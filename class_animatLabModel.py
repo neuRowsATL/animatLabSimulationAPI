@@ -31,8 +31,6 @@ class AnimatLabModelError(Exception):
         """
         self.value = value
         
-        return True
-    
     def __str__(self):
         """
         __str__()
