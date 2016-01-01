@@ -5,13 +5,13 @@ Implementation of this script requires the packages listed below. Most of these 
 
 REQUIRED STANDARD PACKAGES
 =================================
-os          Provides an interface to the command line\n
-csv         Allows the script to read/write spreadsheets to text files\n
-xml         Parses and manages XML data, such as .asim files\n
-glob        Convenient library to iterate through files and folders\n
+-- os | Provides an interface to the command line
+-- csv | Allows the script to read/write spreadsheets to text files
+-- xml | Parses and manages XML data, such as .asim files
+-- glob | Convenient library to iterate through files and folders
 
 REQUIRED SCIENTIFIC PACKAGES
 =================================
-numpy       Provides tools to manage mathematical constructs such as matrices
-scipy       Provides analytical tools such as statistics as well as continuous and discrete transforms
-matplotlib  Popular visualization library
+-- numpy | Provides tools to manage mathematical constructs such as matrices
+-- scipy | Provides analytical tools such as statistics as well as continuous and discrete transforms
+-- matplotlib | Popular visualization library
