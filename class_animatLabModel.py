@@ -11,8 +11,6 @@ import numpy as np
 
 import xml.etree.ElementTree as elementTree
 
-# NEED TO REMOVE PYDSTOOL DEPENDENCIES
-from PyDSTool import args
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
@@ -163,11 +161,11 @@ class AnimatLabModel(object):
                 for el in module.find("Adapters").getchildren():
                     lookupAppend(el, "Adapters")
             
-        self.lookup = args()
-        self.lookup.Type = lookupType
-        self.lookup.ID = lookupID
-        self.lookup.Name = lookupName
-        self.lookup.Element = lookupElement
+        self.lookup = {}
+        self.lookup["Type"] = lookupType
+        self.lookup["ID"] = lookupID
+        self.lookup["Name"] = lookupName
+        self.lookup["Element"] = lookupElement
         
         
     ## GET functions
@@ -200,7 +198,10 @@ class AnimatLabModel(object):
         Last updated:   December 28, 2015
         Modified by:    Bryce Chung <bchung4@student.gsu.edu>
         """
-        return self.tree.getroot()
+        try:
+           return self.tree.getroot()
+        except:
+           raise KeyError("XML tree element not initiated")
     
     
     ## SET functions
