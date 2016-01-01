@@ -11,6 +11,8 @@ import numpy as np
 
 import xml.etree.ElementTree as elementTree
 
+global verbose
+verbose = 3
 
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
@@ -239,7 +241,7 @@ class AnimatLabModel(object):
         Last updated:   December 28, 2015
         Modified by:    Bryce Chung
         """
-        return np.array(self.lookup.Element)[np.where(np.array(self.lookup.Type) == elType)[0]]
+        return np.array(self.lookup["Element"])[np.where(np.array(self.lookup["Type"]) == elType)[0]]
                 
                 
     def getElementByName(self, elName):
@@ -253,7 +255,7 @@ class AnimatLabModel(object):
         Modified by:    Bryce Chung
         """
         
-        matches = np.array(self.lookup.Element)[np.where(np.array(self.lookup.Name) == elName)[0]]
+        matches = np.array(self.lookup["Element"])[np.where(np.array(self.lookup["Name"]) == elName)[0]]
         if len(matches) > 1:
             print "WARNING: More than one element with name found!!\n\n %i instance(s) with name %s" % (len(matches), elName)
             return matches
@@ -274,7 +276,7 @@ class AnimatLabModel(object):
         Last updated:   December 28, 2015
         Modified by:    Bryce Chung
         """
-        matches = np.array(self.lookup.Element)[np.where(np.array(self.lookup.ID) == elID)[0]]
+        matches = np.array(self.lookup["Element"])[np.where(np.array(self.lookup["ID"]) == elID)[0]]
         if len(matches) > 1:
             print "WARNING: More than one element with ID found!!\n\n %i instance(s) with ID %s" % (len(matches, elID))
             return matches
