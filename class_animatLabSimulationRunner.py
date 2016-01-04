@@ -9,6 +9,9 @@ Description:     This class allows the user to run AnimatLab simulations from Py
 import os, glob, shutil
 import subprocess
 
+global verbose
+verbose = 3
+
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
 
