@@ -1,31 +1,67 @@
 """
 Created by:      Bryce Chung
 Last modified:   January 4, 2016
+
+Description:     This class allows the user to run AnimatLab simulations from Python.
 """
 
+# Import dependencies
 import os, glob, shutil
 import subprocess
 
+## ===== ===== ===== ===== =====
+## ===== ===== ===== ===== =====
 
 class AnimatLabSimRunnerError(Exception):
+    """
+    This class manages animatLabSimulationRunner errors.
+    Right now this class does nothing other than print an error message.
+    
+    Last updated:   January 4, 2016
+    Modified by:    Bryce Chung
+    """
     def __init__(self, value):
+        """
+        __init__(value)
+        Set the value of the error message.
+        """
         self.value = value
     def __str__(self):
+        """
+        __str__()
+        Returns the value of the error message.
+        """
         return repr(self.value)
         
 class animatLabSimulationRunner(object):
     """
-    Manages simulation resources including:
-    - AnimatLab SimRunner script and executable
-    - Copying model folders and files
-    - Copying ASIM file(s)
-    - Copying result files
-    - Can attach a callback to postProcess() for post-simulation data processing
+    animatLabSimulationRunner(simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles='')
+    API class to iterate through AnimatLab simulation files (*.asim) organized in a folder.
+    This tool is analogous to the SimRunner utility included in the AnimatLab SDK.
+    
+    simRunnerName     Unique name for sim runner object instance
+    rootFolder        Full path of folder within which all other folders are saved
+    commonFiles       Full path of AnimatLab project folder (contains *.aproj file)
+    sourceFiles       Full path to AnimatLab binary exectuable (contains AnimatLab.exe)
+    simFiles          Full path to AnimatLab simualtion files (contains *.asim files)
+    resultFiles       Full path to folder where result files will be saved
+    
+    do_simulation()          Run simulation set in simFiles folder using the defined parameters
+    set_each_callback(fn)    Set a callback function to execute upon completing EACH simulation
+    _each_callback_fn()      Executes callback after EACH simulation is complete
+    set_master_callback(fn)  Set a callback function to execute upon completing ALL simulations
     """
     def __init__(self, simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles=''):
         """
-        Set subFolders=True to keep simulation and result files in separate
-        folders.
+        __init__(simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles='')
+        
+        simRunnerName     Unique name for sim runner object instance
+        rootFolder        Full path of folder within which all other folders are saved
+        commonFiles       Full path of AnimatLab project folder (contains *.aproj file)
+        sourceFiles       Full path to AnimatLab binary exectuable (contains AnimatLab.exe)
+        simFiles          Full path to AnimatLab simualtion files (contains *.asim files)
+        resultFiles       Full path to folder where result files will be saved
+        
         
         If resultFiles is left empty, simulation result data will be saved to the root folder.
         """
@@ -38,7 +74,8 @@ class animatLabSimulationRunner(object):
         self.simFiles = simFiles
         self.resultFiles = resultFiles
         
-        self.callback = self._callback_fn
+        # Initialize callback function for each simulation
+        self.each_callback = self._each_callback_fn
         
         
     def do_simulation(self):
@@ -112,19 +149,28 @@ class animatLabSimulationRunner(object):
             ## Delete temporary simulation file from common project folder
             os.remove(pathTempSim)            
             
+            ## Copy data files to resultsFolder
+            self._each_callback_fn()
+            
             ## Call post-process function
-            self.callback()
+            self.each_callback()
 
             
         ## Delete temporary model folder
         shutil.rmtree(os.path.join(self.rootFolder, self.name))
-
-    def set_callback(self, fn):
-        self.callback = fn
         
+        ## Execute master callback function
+        self.master_callback()
 
-    def _callback_fn(self):
+    def set_each_callback(self, fn):
+        self.each_callback = fn
+
+    def _each_callback_fn(self):
         ## Save chart result files to results folder
         for f in glob.glob(os.path.join(self.commonFiles, '*.txt')):
             shutil.copy2(f, os.path.join(self.resultFiles, f))
             os.remove(f)
+
+    def set_master_callback(self, fn):
+        self.master_callback = fn
+        
