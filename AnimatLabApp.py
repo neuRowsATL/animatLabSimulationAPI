@@ -6,6 +6,7 @@ Last modified:   December 31, 2015
 """
 
 import class_animatLabModel as AnimatLabModel
+import class_animatLabSimulationRunner as AnimatLabSimRunner
 
 global verbose
 verbose = 3
@@ -44,3 +45,15 @@ PhasicDepMN.find("Noise").text = '0.1'
 # Now that you've changed a property, save the updated model:
 model.saveXML()
 
+
+# Initiate AnimatLabSimulationRunner object
+sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
+    "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
+    "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
+    "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
+    "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \
+    resultFiles = "F:/_DISSERTATION/SimulationFiles/_MASTER/")
+    
+
+# Execute AnimatLab simulations
+sims.do_simulation()
