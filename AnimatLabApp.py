@@ -12,7 +12,6 @@ global verbose
 verbose = 3
 
 
-
 ## This is example code that you can use as the basis for running your own script.
 
 # This command creates an AnimatLabModel object that will allow you to access the model elements
@@ -47,7 +46,7 @@ model.saveXML()
 
 
 # Initiate AnimatLabSimulationRunner object
-sims = AnimatLabSimRunner.AnimatLabSimRunner("Test Sims", \
+sims = AnimatLabSimRunner.animatLabSimRunner("Test Sims", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
     "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
