@@ -57,7 +57,7 @@ model.saveXML()
 ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 # Initiate AnimatLabSimulationRunner object
-sims = AnimatLabSimRunner.animatLabSimRunner("Test Sims", \
+sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
     "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
