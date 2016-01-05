@@ -87,5 +87,8 @@ simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
 # simSet.set_by_range({'a': paramRange1})
 # simSet.set_by_range({'b': paramRange2})
 
+# Get the number of points in the parameter set
 print "Sample size: %i" % simSet.get_size()
+
+# Print the set the sample points
 print simSet.samplePts
