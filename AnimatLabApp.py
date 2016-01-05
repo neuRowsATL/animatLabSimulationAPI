@@ -66,7 +66,9 @@ sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
     
 
 # Execute AnimatLab simulations
-sims.do_simulation()
+## Uncomment the next line to ACTUALLY run the simulations...
+## This may take several minutes, so it is commented out here
+#sims.do_simulation()
 
 ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 ## EXAMPLE FOR USING SimulationSet CLASS
