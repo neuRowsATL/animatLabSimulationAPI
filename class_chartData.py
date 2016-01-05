@@ -15,6 +15,20 @@ Description:     This class can upload and save data from text files generated b
                  binary events as 0's or 1's.
 """
 
+import os, glob
+import csv
+
+import numpy as np
+
+import multiprocessing
+import pickle
+
+global verbose
+verbose = 3
+
+## ===== ===== ===== ===== =====
+## ===== ===== ===== ===== =====
+
 class chartData(object):
     """
     chartData(chartName)
@@ -192,10 +206,10 @@ class chartData(object):
             os.remove(filename)
             raise ValueError("File already exists!")
         
-        saveObjects(self.data, filename)
+        pickle.dump(self.data, open(filename, 'wb'))
         
     
     def loadData(self, filename=''):
         if filename == '':
             filename = 'chartData_%s.dat' % self.name
-        self.data = loadObjects(filename)[0]
+        self.data = pickle.load(open(filename, 'rb'))
