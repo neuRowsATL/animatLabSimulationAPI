@@ -7,6 +7,8 @@ Last modified:   December 31, 2015
 
 import class_animatLabModel as AnimatLabModel
 
+import class_chartData as chartData
+
 global verbose
 verbose = 3
 
@@ -43,4 +45,28 @@ PhasicDepMN.find("Noise").text = '0.1'
 
 # Now that you've changed a property, save the updated model:
 model.saveXML()
+
+
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE OF USE FOR chartData CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+# Instantiate chartData object with unique name
+chartData = chartData('Example1')
+
+## AnimatLab CSV data files can be loaded individually or in groups
+chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/Afferents.txt")
+chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/Circuit.txt")
+
+# chartData.get_source(["F:/__DISSERTATION/SimulationFiles/_MASTER/Afferents.txt", \
+#    "F:/__DISSERTATION/SimulationFiles/_MASTER/Circuit.txt"])
+
+# Reduce the impact on memory by compressing spike data channels
+chartData.compress()
+
+# Save compressed data to a data file using default naming options
+chartData.saveData()
+
+# Load data from saved file using the same unique chartData object name
+chartData.loadData()
 
