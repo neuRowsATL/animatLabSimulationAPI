@@ -174,7 +174,7 @@ class animatLabSimulationRunner(object):
             os.remove(pathTempSim)            
             
             # Copy data files to resultsFolder
-            self._each_callback_fn()
+            self._each_callback_fn(name=simFile.split('.')[0])
             
             # Call post-process function
             self.each_callback()
@@ -200,7 +200,7 @@ class animatLabSimulationRunner(object):
         self.each_callback = fn
 
 
-    def _each_callback_fn(self):
+    def _each_callback_fn(self, name=''):
         """
         _each_callback_fun()
         
@@ -213,7 +213,7 @@ class animatLabSimulationRunner(object):
         
         # Save chart result files to results folder
         for f in glob.glob(os.path.join(self.commonFiles, '*.txt')):
-            shutil.copy2(f, os.path.join(self.resultFiles, os.path.split(f)[-1]))
+            shutil.copy2(f, os.path.join(self.resultFiles, str(name) + os.path.split(f)[-1]))
             # Remove results file from commonFiles folder
             os.remove(f)
 
