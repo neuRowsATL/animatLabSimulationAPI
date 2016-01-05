@@ -23,18 +23,22 @@ class AnimatLabSimRunnerError(Exception):
     Last updated:   January 4, 2016
     Modified by:    Bryce Chung
     """
+    
     def __init__(self, value):
         """
         __init__(value)
         Set the value of the error message.
         """
+        
         self.value = value
     def __str__(self):
         """
         __str__()
         Returns the value of the error message.
         """
+        
         return repr(self.value)
+        
         
 class animatLabSimulationRunner(object):
     """
@@ -55,6 +59,7 @@ class animatLabSimulationRunner(object):
     set_master_callback(fn)  Set a callback function to execute upon completing ALL simulations
     _master_callback_fn()    Dummy method to be defined by user
     """
+    
     def __init__(self, simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles=''):
         """
         __init__(simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles='')
@@ -98,6 +103,7 @@ class animatLabSimulationRunner(object):
         Last updated:   January 4, 2016
         Modified by:    Bryce Chung
         """
+        
         # Check that root folder exists
         if not os.path.isdir(self.rootFolder):
             raise AnimatLabSimRunnerError("Root folder does not exist!\n%s" % self.rootFolder)
@@ -180,6 +186,7 @@ class animatLabSimulationRunner(object):
         # Execute master callback function
         self.master_callback()
 
+
     def set_each_callback(self, fn):
         """
         set_each_callback(fn)
@@ -189,7 +196,9 @@ class animatLabSimulationRunner(object):
         Last updated:   January 4, 2016
         Modified by:    Bryce Chung
         """
+        
         self.each_callback = fn
+
 
     def _each_callback_fn(self):
         """
@@ -201,11 +210,13 @@ class animatLabSimulationRunner(object):
         Last updated:   January 4, 2016
         Modified by:    Bryce Chung
         """
+        
         # Save chart result files to results folder
         for f in glob.glob(os.path.join(self.commonFiles, '*.txt')):
             shutil.copy2(f, os.path.join(self.resultFiles, f))
             # Remove results file from commonFiles folder
             os.remove(f)
+
 
     def set_master_callback(self, fn):
         """
@@ -216,6 +227,7 @@ class animatLabSimulationRunner(object):
         Last updated:   January 4, 2016
         Modified by:    Bryce Chung
         """
+        
         self.master_callback = fn
         
     def _master_callback_fn(self):
@@ -224,5 +236,6 @@ class animatLabSimulationRunner(object):
         
         Dummy function to be overwritten by user.
         """
+        
         pass
         
