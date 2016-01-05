@@ -7,12 +7,19 @@ Last modified:   December 31, 2015
 
 import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
+import class_simulationSet as SimulationSet
+
+import numpy as np
 
 global verbose
 verbose = 3
 
 
 ## This is example code that you can use as the basis for running your own script.
+
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE FOR USING AnimatLabModel CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 # This command creates an AnimatLabModel object that will allow you to access the model elements
 model = AnimatLabModel.AnimatLabModel("F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/")
@@ -45,6 +52,10 @@ PhasicDepMN.find("Noise").text = '0.1'
 model.saveXML()
 
 
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE FOR USING AnimatLabSimulationRunner CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
 # Initiate AnimatLabSimulationRunner object
 sims = AnimatLabSimRunner.animatLabSimRunner("Test Sims", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
@@ -56,3 +67,25 @@ sims = AnimatLabSimRunner.animatLabSimRunner("Test Sims", \
 
 # Execute AnimatLab simulations
 sims.do_simulation()
+
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE FOR USING SimulationSet CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+
+# Instantiate the simulationSet object
+simSet = SimulationSet.SimulationSet()
+
+# Generate the range of parameter values as a list-like object
+paramRange1 = np.arange(0, 13, 0.1)
+paramRange2 = np.arange(0, 10, 0.5)
+
+# Add the parameter ranges and generate the combinations
+simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
+
+# This operation can be done in one line (as above) or separately
+# Each addition of parameters generates the new combinations when added
+# simSet.set_by_range({'a': paramRange1})
+# simSet.set_by_range({'b': paramRange2})
+
+print "Sample size: %i" % simSet.get_size()
+print simSet.samplePts
