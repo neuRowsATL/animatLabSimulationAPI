@@ -16,7 +16,7 @@ verbose = 3
 ## ===== ===== ===== ===== =====
 ## ===== ===== ===== ===== =====
 
-class simulationSet(object):
+class SimulationSet(object):
     """
     simulationSet()
     
