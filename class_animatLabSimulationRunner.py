@@ -40,7 +40,7 @@ class AnimatLabSimRunnerError(Exception):
         return repr(self.value)
         
         
-class animatLabSimulationRunner(object):
+class AnimatLabSimulationRunner(object):
     """
     animatLabSimulationRunner(simRunnerName, rootFolder, commonFiles, sourceFiles, simFiles, resultFiles='')
     API class to iterate through AnimatLab simulation files (*.asim) organized in a folder.
