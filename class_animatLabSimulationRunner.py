@@ -118,7 +118,7 @@ class animatLabSimulationRunner(object):
         
         # Make a copy of common model files to use during simulations
         fldrCommonFiles = os.path.join(self.rootFolder, self.name)
-        if os.path.isdir(self.commonFiles):
+        if os.path.isdir(fldrCommonFiles):
             dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
             count = 0
             for d in dirs:
