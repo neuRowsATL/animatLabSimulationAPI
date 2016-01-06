@@ -123,7 +123,7 @@ class animatLabSimulationRunner(object):
             for d in dirs:
                 if os.path.isdir(os.path.join(self.rootFolder, d)):
                     count += 1
-            shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name+str(count)))
+            shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name+'-'+str(count)))
             
         else:
             shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name))
