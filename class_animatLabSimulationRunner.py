@@ -31,6 +31,7 @@ class AnimatLabSimRunnerError(Exception):
         """
         
         self.value = value
+        
     def __str__(self):
         """
         __str__()
@@ -116,7 +117,16 @@ class animatLabSimulationRunner(object):
                 raise AnimatLabSimRunnerError("No AnimatLab project files found in common files folder.\n%s" % self.commonFiles)
         
         # Make a copy of common model files to use during simulations
-        shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name))
+        if os.path.isdir(self.commonFiles):
+            dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
+            count = 0
+            for d in dirs:
+                if os.path.isdir(os.path.join(self.rootFolder, d)):
+                    count += 1
+            shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name+str(count)))
+            
+        else:
+            shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name))
         
         # Check that source files with AnimatLab binaries exist
         if not os.path.isdir(self.sourceFiles):
@@ -168,7 +178,7 @@ class animatLabSimulationRunner(object):
             #raw_input("Press <ENTER> to continue.")
             
             # Send shell command
-            subprocess.call(listArgs)
+            #subprocess.call(listArgs)
                         
             # Delete temporary simulation file from common project folder
             os.remove(pathTempSim)            
