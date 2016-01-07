@@ -51,7 +51,7 @@ sims = AnimatLabSimRunner.animatLabSimulationRunner("Test Sims", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
     "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \
-    resultFiles = "F:/_DISSERTATION/SimulationFiles/_MASTER/")
+    resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/")
     
 
 # Execute AnimatLab simulations
