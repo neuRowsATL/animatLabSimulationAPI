@@ -86,12 +86,6 @@ class animatLabSimulationRunner(object):
         self.simFiles = simFiles
         self.resultFiles = resultFiles
         
-        # Initialize callback function for each simulation
-        self.each_callback = self._each_callback_fn
-        
-        # Initialize callback function to execute after ALL simulations are complete
-        self.master_callback = self._master_callback_fn
-        
         
     def do_simulation(self):
         """
@@ -185,15 +179,9 @@ class animatLabSimulationRunner(object):
             # Copy data files to resultsFolder
             self._each_callback_fn(name=simFile.split('.')[0])
             
-            # Call post-process function
-            self.each_callback()
-
             
         # Delete temporary model folder
-        shutil.rmtree(fldrCommonFiles)
-        
-        # Execute master callback function
-        self.master_callback()
+        shutil.rmtree(fldrCommonFiles)s
 
 
     def set_each_callback(self, fn):
@@ -206,7 +194,7 @@ class animatLabSimulationRunner(object):
         Modified by:    Bryce Chung
         """
         
-        self.each_callback = fn
+        pass
 
 
     def _each_callback_fn(self, name=''):
@@ -237,14 +225,4 @@ class animatLabSimulationRunner(object):
         Modified by:    Bryce Chung
         """
         
-        self.master_callback = fn
-        
-    def _master_callback_fn(self):
-        """
-        _master_callback_fn()
-        
-        Dummy function to be overwritten by user.
-        """
-        
         pass
-        
