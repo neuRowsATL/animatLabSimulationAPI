@@ -165,11 +165,11 @@ class animatLabSimulationRunner(object):
             
             # Copy simulation file to common project folder
             pathOrigSim = os.path.join(self.simFiles, simFile)
-            pathTempSim = os.path.join(self.commonFiles, simFile)
+            pathTempSim = os.path.join(fldrCommonFiles, simFile)
             shutil.copy2(pathOrigSim, pathTempSim)
             
             # Create simulation shell command
-            strArg = os.path.join(self.commonFiles, simFile)
+            strArg = os.path.join(fldrCommonFiles, simFile)
             listArgs.append(strArg)
             
             ## For debugging
