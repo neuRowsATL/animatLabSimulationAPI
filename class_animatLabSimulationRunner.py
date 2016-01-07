@@ -210,7 +210,11 @@ class animatLabSimulationRunner(object):
         
         # Save chart result files to results folder
         for f in glob.glob(os.path.join(sourceFolder, '*.txt')):
-            shutil.copy2(f, os.path.join(self.resultFiles, str(name) + "_" + os.path.split(f)[-1]))
+            fname = str(name) + "_" + os.path.split(f)[-1].split('.')[0])
+            ix = len(glob.glob(os.path.join( self.resultFiles, fname.split('.')[0]+'*.asim' )
+            if ix > 0:
+                fname += '-%i' % ix
+            shutil.copy2(f, os.path.join(self.resultFiles, fname)
             # Remove results file from commonFiles folder
             os.remove(f)
 
