@@ -177,7 +177,7 @@ class animatLabSimulationRunner(object):
             os.remove(pathTempSim)            
             
             # Copy data files to resultsFolder
-            self._each_callback_fn(folder=fldrActiveFiles, name=simFile.split('.')[0])
+            self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
             
             
         # Delete temporary model folder
