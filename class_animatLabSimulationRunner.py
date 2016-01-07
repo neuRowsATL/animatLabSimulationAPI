@@ -111,14 +111,14 @@ class animatLabSimulationRunner(object):
                 raise AnimatLabSimRunnerError("No AnimatLab project files found in common files folder.\n%s" % self.commonFiles)
         
         # Make a copy of common model files to use during simulations
-        fldrCommonFiles = os.path.join(self.rootFolder, self.name)
+        fldrActiveFiles = os.path.join(self.rootFolder, self.name)
         if os.path.isdir(fldrCommonFiles):
             dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
             count = 0
             for d in dirs:
                 if os.path.isdir(os.path.join(self.rootFolder, d)):
                     count += 1
-            fldrCommonFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
+            fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
         shutil.copytree(self.commonFiles, fldrCommonFiles)
         
         # Check that source files with AnimatLab binaries exist
@@ -159,11 +159,11 @@ class animatLabSimulationRunner(object):
             
             # Copy simulation file to common project folder
             pathOrigSim = os.path.join(self.simFiles, simFile)
-            pathTempSim = os.path.join(fldrCommonFiles, simFile)
+            pathTempSim = os.path.join(fldrActiveFiles, simFile)
             shutil.copy2(pathOrigSim, pathTempSim)
             
             # Create simulation shell command
-            strArg = os.path.join(fldrCommonFiles, simFile)
+            strArg = os.path.join(fldrActiveFiles, simFile)
             listArgs.append(strArg)
             
             ## For debugging
@@ -177,7 +177,7 @@ class animatLabSimulationRunner(object):
             os.remove(pathTempSim)            
             
             # Copy data files to resultsFolder
-            self._each_callback_fn(name=simFile.split('.')[0])
+            self._each_callback_fn(folder=fldrActiveFiles, name=simFile.split('.')[0])
             
             
         # Delete temporary model folder
@@ -197,7 +197,7 @@ class animatLabSimulationRunner(object):
         pass
 
 
-    def _each_callback_fn(self, name=''):
+    def _each_callback_fn(self, sourceFolder='', name=''):
         """
         _each_callback_fun()
         
@@ -209,7 +209,7 @@ class animatLabSimulationRunner(object):
         """
         
         # Save chart result files to results folder
-        for f in glob.glob(os.path.join(self.commonFiles, '*.txt')):
+        for f in glob.glob(os.path.join(sourceFolder, '*.txt')):
             shutil.copy2(f, os.path.join(self.resultFiles, str(name) + "_" + os.path.split(f)[-1]))
             # Remove results file from commonFiles folder
             os.remove(f)
