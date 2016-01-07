@@ -112,14 +112,14 @@ class animatLabSimulationRunner(object):
         
         # Make a copy of common model files to use during simulations
         fldrActiveFiles = os.path.join(self.rootFolder, self.name)
-        if os.path.isdir(fldrCommonFiles):
+        if os.path.isdir(fldrActiveFiles):
             dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
             count = 0
             for d in dirs:
                 if os.path.isdir(os.path.join(self.rootFolder, d)):
                     count += 1
             fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
-        shutil.copytree(self.commonFiles, fldrCommonFiles)
+        shutil.copytree(self.commonFiles, fldrActiveFiles)
         
         # Check that source files with AnimatLab binaries exist
         if not os.path.isdir(self.sourceFiles):
