@@ -181,7 +181,7 @@ class animatLabSimulationRunner(object):
             
             
         # Delete temporary model folder
-        shutil.rmtree(fldrCommonFiles)
+        shutil.rmtree(fldrActiveFiles)
 
 
     def set_each_callback(self, fn):
