@@ -4,7 +4,7 @@ Last modified:  January 4, 2016
 
 Description:    This class manages ranges of parameters and generates combinations according
                 to the ranges defined by the user. This class is used by the ProjectManager
-                class to generate simulation files for different parameter sets. This is not magical.
+                class to generate simulation files for different parameter sets.
 """
 
 import numpy as np
