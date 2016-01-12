@@ -7,6 +7,7 @@ Description:    This class manages ranges of parameters and generates combinatio
                 class to generate simulation files for different parameter sets.
 """
 
+from copy import copy
 import numpy as np
 
 
@@ -36,7 +37,7 @@ class SimulationSet(object):
         Modified by:    Bryce Chung
         """
         
-        self.paramRanges = args()
+        self.paramRanges = {}
         self.samplePts = []
         
     def set_by_range(self, params):
