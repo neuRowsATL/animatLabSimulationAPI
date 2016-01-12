@@ -62,7 +62,7 @@ sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
     "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
     "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \
-    resultFiles = "F:/_DISSERTATION/SimulationFiles/_MASTER/")
+    resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/")
     
 
 # Execute AnimatLab simulations
@@ -78,8 +78,8 @@ sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
 simSet = SimulationSet.SimulationSet()
 
 # Generate the range of parameter values as a list-like object
-paramRange1 = np.arange(0, 13, 0.1)
-paramRange2 = np.arange(0, 10, 0.5)
+paramRange1 = np.arange(0, 13.5, 0.5)
+paramRange2 = np.arange(0, 13.5, 0.5)
 
 # Add the parameter ranges and generate the combinations
 simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
@@ -89,8 +89,10 @@ simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
 # simSet.set_by_range({'a': paramRange1})
 # simSet.set_by_range({'b': paramRange2})
 
+# Print the set the sample points
+print simSet.samplePts
+
 # Get the number of points in the parameter set
 print "Sample size: %i" % simSet.get_size()
 
-# Print the set the sample points
-print simSet.samplePts
+

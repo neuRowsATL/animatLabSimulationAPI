@@ -31,6 +31,7 @@ class AnimatLabSimRunnerError(Exception):
         """
         
         self.value = value
+        
     def __str__(self):
         """
         __str__()
@@ -85,12 +86,6 @@ class AnimatLabSimulationRunner(object):
         self.simFiles = simFiles
         self.resultFiles = resultFiles
         
-        # Initialize callback function for each simulation
-        self.each_callback = self._each_callback_fn
-        
-        # Initialize callback function to execute after ALL simulations are complete
-        self.master_callback = self._master_callback_fn
-        
         
     def do_simulation(self):
         """
@@ -116,7 +111,15 @@ class AnimatLabSimulationRunner(object):
                 raise AnimatLabSimRunnerError("No AnimatLab project files found in common files folder.\n%s" % self.commonFiles)
         
         # Make a copy of common model files to use during simulations
-        shutil.copytree(self.commonFiles, os.path.join(self.rootFolder, self.name))
+        fldrActiveFiles = os.path.join(self.rootFolder, self.name)
+        if os.path.isdir(fldrActiveFiles):
+            dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
+            count = 0
+            for d in dirs:
+                if os.path.isdir(os.path.join(self.rootFolder, d)):
+                    count += 1
+            fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
+        shutil.copytree(self.commonFiles, fldrActiveFiles)
         
         # Check that source files with AnimatLab binaries exist
         if not os.path.isdir(self.sourceFiles):
@@ -156,11 +159,11 @@ class AnimatLabSimulationRunner(object):
             
             # Copy simulation file to common project folder
             pathOrigSim = os.path.join(self.simFiles, simFile)
-            pathTempSim = os.path.join(self.commonFiles, simFile)
+            pathTempSim = os.path.join(fldrActiveFiles, simFile)
             shutil.copy2(pathOrigSim, pathTempSim)
             
             # Create simulation shell command
-            strArg = os.path.join(self.commonFiles, simFile)
+            strArg = os.path.join(fldrActiveFiles, simFile)
             listArgs.append(strArg)
             
             ## For debugging
@@ -168,23 +171,17 @@ class AnimatLabSimulationRunner(object):
             #raw_input("Press <ENTER> to continue.")
             
             # Send shell command
-            subprocess.call(listArgs)
+            #subprocess.call(listArgs)
                         
             # Delete temporary simulation file from common project folder
             os.remove(pathTempSim)            
             
             # Copy data files to resultsFolder
-            self._each_callback_fn()
+            self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
             
-            # Call post-process function
-            self.each_callback()
-
             
         # Delete temporary model folder
-        shutil.rmtree(os.path.join(self.rootFolder, self.name))
-        
-        # Execute master callback function
-        self.master_callback()
+        shutil.rmtree(fldrActiveFiles)
 
 
     def set_each_callback(self, fn):
@@ -197,10 +194,10 @@ class AnimatLabSimulationRunner(object):
         Modified by:    Bryce Chung
         """
         
-        self.each_callback = fn
+        pass
 
 
-    def _each_callback_fn(self):
+    def _each_callback_fn(self, sourceFolder='', name=''):
         """
         _each_callback_fun()
         
@@ -212,8 +209,12 @@ class AnimatLabSimulationRunner(object):
         """
         
         # Save chart result files to results folder
-        for f in glob.glob(os.path.join(self.commonFiles, '*.txt')):
-            shutil.copy2(f, os.path.join(self.resultFiles, f))
+        for f in glob.glob(os.path.join(sourceFolder, '*.txt')):
+            fname = str(name) + "_" + os.path.split(f)[-1].split('.')[0]
+            ix = len(glob.glob(os.path.join( self.resultFiles, fname.split('.')[0]+'*.asim' )))
+            if ix > 0:
+                fname += '-%i' % ix
+            shutil.copy2(f, os.path.join(self.resultFiles, fname))
             # Remove results file from commonFiles folder
             os.remove(f)
 
@@ -228,14 +229,4 @@ class AnimatLabSimulationRunner(object):
         Modified by:    Bryce Chung
         """
         
-        self.master_callback = fn
-        
-    def _master_callback_fn(self):
-        """
-        _master_callback_fn()
-        
-        Dummy function to be overwritten by user.
-        """
-        
         pass
-        
