@@ -83,7 +83,7 @@ paramRange1 = np.arange(0, 13.5, 0.5)
 paramRange2 = np.arange(0, 13.5, 0.5)
 
 # Add the parameter ranges and generate the combinations
-simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
+simSet.set_by_range({'OXO CPG.TonicStimulus': paramRange1, 'OXO ARIN.TonicStimulus': paramRange2})
 
 # This operation can be done in one line (as above) or separately
 # Each addition of parameters generates the new combinations when added
@@ -91,7 +91,7 @@ simSet.set_by_range({'a': paramRange1, 'b': paramRange2})
 # simSet.set_by_range({'b': paramRange2})
 
 # Print the set the sample points
-print simSet.samplePts
+#print simSet.samplePts
 
 # Get the number of points in the parameter set
 print "Sample size: %i" % simSet.get_size()
@@ -103,3 +103,5 @@ print "Sample size: %i" % simSet.get_size()
 projMan = ProjectManager.ProjectManager('Test Project')
 projMan.set_aproj(model)
 projMan.set_simRunner(sims)
+
+projMan.make_asims(simSet)

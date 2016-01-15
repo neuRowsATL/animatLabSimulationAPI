@@ -7,6 +7,14 @@ from class_animatLabModel import AnimatLabModel
 from class_animatLabSimulationRunner import AnimatLabSimulationRunner
 from class_simulationSet import SimulationSet
 
+from copy import copy
+
+import os
+
+
+global verbose
+verbose = 3
+
 class ProjectManager(object):
     """
     
@@ -26,6 +34,7 @@ class ProjectManager(object):
         """
         
         self.projName = projName
+        self.activityLog = {}
         self.errorLog = {}
         
         if (type(obj_aproj) == AnimatLabModel) or (obj_aproj is None):
@@ -78,7 +87,57 @@ class ProjectManager(object):
         
         """
         
-        pass
+        if type(obj_simSet) is not SimulationSet:
+            raise TypeError("obj_simSet must be a SimulationSet object!")
+        
+        cols = ['FileName']
+        saveFiles = {}
+        
+        model = copy(self.aproj)
+        basename = os.path.split(model.asimFile)[-1].split('.')[0]
+        
+        countLength = len(str(obj_simSet.get_size()))
+        
+        for ix, sample in enumerate(obj_simSet.samplePts):
+            if verbose > 0:
+                print "\n\nPROCESSING: %s" % str(sample)
+
+            filename = basename + '-' + str(ix+1).zfill(countLength) + '.asim'
+            saveFiles[filename] = sample
+                
+            for pt in sample:
+                if pt not in cols:
+                    cols.append(pt)
+                
+                name, param = pt.split('.')
+                node = model.getElementByName(name)
+                
+                print "%s = %s >> %s" % (pt, node.find(param).text, sample[pt])
+                
+                node.find(param).text = str(sample[pt])
+                
+            model.saveXML(fileName=os.path.join(self.simRunner.simFiles, filename), overwrite=True)
+            
+        del model
+            
+        if verbose > 0:
+            print "WRITING LOG FILE..."
+            
+        f = open(self.projName + '-asims.csv', 'w')
+        f.write(self.simRunner.simFiles+'\n')
+        f.write(','.join(cols)+'\n')
+        
+        for fName in sorted(saveFiles.keys()):
+            colTemplate = ['']*len(cols)
+            
+            colTemplate[0] = fName
+            for key in saveFiles[fName]:
+                colTemplate[cols.index(key)] = str(saveFiles[fName][key])
+            
+            f.write(','.join(colTemplate) + '\n')
+            
+        f.close()
+        
     
     
     def run(self):
