@@ -171,7 +171,7 @@ class AnimatLabSimulationRunner(object):
             #raw_input("Press <ENTER> to continue.")
             
             # Send shell command
-            #subprocess.call(listArgs)
+            subprocess.call(listArgs)
                         
             # Delete temporary simulation file from common project folder
             os.remove(pathTempSim)            

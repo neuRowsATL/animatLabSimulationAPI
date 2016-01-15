@@ -95,4 +95,7 @@ print simSet.samplePts
 # Get the number of points in the parameter set
 print "Sample size: %i" % simSet.get_size()
 
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE FOR USING ProjectManager CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
