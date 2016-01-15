@@ -105,3 +105,7 @@ projMan.set_aproj(model)
 projMan.set_simRunner(sims)
 
 projMan.make_asims(simSet)
+
+"""
+NEED TO REWRITE SIMRUNNER CLASS TO DETERMINE WHETHER TO RUN SIMULATIONS BY GROUPS OF FILES OR BY FOLDER...
+"""
