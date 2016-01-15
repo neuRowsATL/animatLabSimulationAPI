@@ -3,6 +3,10 @@ Created by:      Bryce Chung
 Last modified:   January 4, 2016
 """
 
+from class_animatLabModel import AnimatLabModel
+from class_animatLabSimulationRunner import AnimatLabSimulationRunner
+from class_simulationSet import SimulationSet
+
 class ProjectManager(object):
     """
     
@@ -24,8 +28,15 @@ class ProjectManager(object):
         self.projName = projName
         self.errorLog = {}
         
-        self.aproj = obj_aproj
-        self.simRunner = obj_simRunner
+        if (type(obj_aproj) == AnimatLabModel) or (obj_aproj is None):
+            self.aproj = obj_aproj
+        else:
+            raise TypeError("obj_aproj must be an AnimatLabModel object!")
+        
+        if (type(obj_simRunner) == AnimatLabSimulationRunner) or (obj_simRunner is None):
+            self.simRunner = obj_simRunner
+        else:
+            raise TypeError("obj_simRunner must be an AnimatLabSimulationRunner object!")
         
     
     def set_aproj(self, obj_aproj):
@@ -39,7 +50,10 @@ class ProjectManager(object):
         Modified by:    Bryce Chung
         """
         
-        self.aproj = obj_aproj
+        if type(obj_aproj) == AnimatLabModel:
+            self.aproj = obj_aproj
+        else:
+            raise TypeError("obj_aproj must be an AnimatLabModel object!")
     
     
     def set_simRunner(self, obj_simRunner):
@@ -53,7 +67,10 @@ class ProjectManager(object):
         Modified by:    Bryce Chung
         """
         
-        self.simRunner = obj_simRunner
+        if type(obj_simRunner) == AnimatLabSimulationRunner:
+            self.simRunner = obj_simRunner
+        else:
+            raise TypeError("obj_simRunner must be an AnimatLabSimulationRunner object!")
     
 
     def make_asims(self, obj_simSet):

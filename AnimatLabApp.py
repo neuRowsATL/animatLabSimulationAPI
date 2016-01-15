@@ -101,3 +101,5 @@ print "Sample size: %i" % simSet.get_size()
 ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
 projMan = ProjectManager.ProjectManager('Test Project')
+projMan.set_aproj(model)
+projMan.set_simRunner(sims)
