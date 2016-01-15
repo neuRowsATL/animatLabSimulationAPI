@@ -8,6 +8,7 @@ Last modified:   December 31, 2015
 import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 import class_simulationSet as SimulationSet
+import class_projectManager as ProjectManager
 
 import numpy as np
 
@@ -95,4 +96,8 @@ print simSet.samplePts
 # Get the number of points in the parameter set
 print "Sample size: %i" % simSet.get_size()
 
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+## EXAMPLE FOR USING ProjectManager CLASS
+## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 
+projMan = ProjectManager.ProjectManager('Test Project')

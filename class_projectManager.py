@@ -8,7 +8,7 @@ class ProjectManager(object):
     
     """
     
-    __init__(self, projName, obj_aproj=None, obj_simRunner=None):
+    def __init__(self, projName, obj_aproj=None, obj_simRunner=None):
         """
         __init__(projName, obj_aproj=None, obj_simRunner=None, obj_simSet=None)
         Initiate ProjectManager object
@@ -28,7 +28,7 @@ class ProjectManager(object):
         self.simRunner = obj_simRunner
         
     
-    set_aproj(self, obj_aproj):
+    def set_aproj(self, obj_aproj):
         """
         set_aproj(obj_aproj)
         Sets the AnimatLabModel object for the ProjectManager
@@ -42,7 +42,7 @@ class ProjectManager(object):
         self.aproj = obj_aproj
     
     
-    set_simRunner(self, obj_simRunner):
+    def set_simRunner(self, obj_simRunner):
         """
         set_simRunner(obj_simRunner)
         Sets the simRunner object for the ProjectManager
@@ -56,7 +56,7 @@ class ProjectManager(object):
         self.simRunner = obj_simRunner
     
 
-    make_asims(self, obj_simSet):
+    def make_asims(self, obj_simSet):
         """
         
         """
@@ -64,7 +64,7 @@ class ProjectManager(object):
         pass
     
     
-    run(self):
+    def run(self):
         """
         
         """
