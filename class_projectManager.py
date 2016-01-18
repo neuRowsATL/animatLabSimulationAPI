@@ -10,10 +10,44 @@ from class_simulationSet import SimulationSet
 from copy import copy
 
 import os
-
+import multiprocessing
 
 global verbose
 verbose = 3
+
+
+def saveAsimWrapper(args):
+    return saveAsim(*args)
+
+def saveAsim(samplePt, obj_animatLabModel, fldrSimFiles, ix, indexLen, verbose=3):
+    cols = ['ERROR']
+    
+    basename = os.path.split(obj_animatLabModel.asimFile)[-1].split('.')[0]
+    saveFile = {}
+
+    filename = basename + '-' + str(ix+1).zfill(indexLen) + '.asim'
+            
+    for ptVar in samplePt:
+        if ptVar not in cols:
+            cols.append(ptVar)
+        
+        name, param = ptVar.split('.')
+        node = obj_animatLabModel.getElementByName(name)
+        
+        print "\n\n%s = %s >> %s" % (ptVar, node.find(param).text, samplePt[ptVar])
+        
+        node.find(param).text = str(samplePt[ptVar])
+        
+    obj_animatLabModel.saveXML(fileName=os.path.join(fldrSimFiles, filename), overwrite=True)    
+
+    samplePt["ERROR"] = os.path.getsize(os.path.join(fldrSimFiles, filename))
+    
+    saveFile[filename] = samplePt
+    del obj_animatLabModel
+    
+    return (saveFile, cols)
+    
+
 
 class ProjectManager(object):
     """
@@ -80,7 +114,7 @@ class ProjectManager(object):
             self.simRunner = obj_simRunner
         else:
             raise TypeError("obj_simRunner must be an AnimatLabSimulationRunner object!")
-    
+
 
     def make_asims(self, obj_simSet):
         """
@@ -91,34 +125,23 @@ class ProjectManager(object):
             raise TypeError("obj_simSet must be a SimulationSet object!")
         
         cols = ['FileName']
-        saveFiles = {}
-        
-        model = copy(self.aproj)
-        basename = os.path.split(model.asimFile)[-1].split('.')[0]
-        
+        saveFiles = {}     
+    
         countLength = len(str(obj_simSet.get_size()))
-        
-        for ix, sample in enumerate(obj_simSet.samplePts):
-            if verbose > 0:
-                print "\n\nPROCESSING: %s" % str(sample)
 
-            filename = basename + '-' + str(ix+1).zfill(countLength) + '.asim'
-            saveFiles[filename] = sample
-                
-            for pt in sample:
-                if pt not in cols:
-                    cols.append(pt)
-                
-                name, param = pt.split('.')
-                node = model.getElementByName(name)
-                
-                print "%s = %s >> %s" % (pt, node.find(param).text, sample[pt])
-                
-                node.find(param).text = str(sample[pt])
-                
-            model.saveXML(fileName=os.path.join(self.simRunner.simFiles, filename), overwrite=True)
+        pool = multiprocessing.Pool()
+        results = pool.map(saveAsimWrapper, [(pts, copy(self.aproj), self.simRunner.simFiles, ix, countLength, verbose) for ix, pts in enumerate(obj_simSet.samplePts)])
+        pool.close()
+    
+        for result in results:
+            fileInfo, colInfo = result
             
-        del model
+            fileKey = fileInfo.keys()[0]
+            saveFiles[fileKey] = fileInfo[fileKey]
+            
+            for col in colInfo:
+                if col not in cols:
+                    cols.append(col)
             
         if verbose > 0:
             print "WRITING LOG FILE..."
@@ -137,7 +160,6 @@ class ProjectManager(object):
             f.write(','.join(colTemplate) + '\n')
             
         f.close()
-        
     
     
     def run(self):
@@ -145,4 +167,4 @@ class ProjectManager(object):
         
         """
         
-        pass
+        self.simRunner.do_simulation()
