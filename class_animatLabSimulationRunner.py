@@ -41,6 +41,44 @@ class AnimatLabSimRunnerError(Exception):
         
         return repr(self.value)
         
+def runAnimatLabSimulationWrapper(args):
+    return runAnimatLabSimulation(*args)
+
+
+def runAnimatLabSimulation(asimFile, obj_simRunner):
+    
+    return obj_simRunner.commonFiles
+    
+    """
+    if verbose > 1:
+        print "\n\nPROCESSING SIMULATION FILE: %s" % asimFile
+        
+    # Construct command to execute simulations
+    programStr = os.path.join(self.sourceFiles, 'Animatsimulator')        
+    listArgs = [programStr]
+    
+    # Copy simulation file to common project folder
+    pathOrigSim = os.path.join(self.simFiles, simFile)
+    pathTempSim = os.path.join(fldrActiveFiles, simFile)
+    shutil.copy2(pathOrigSim, pathTempSim)
+    
+    # Create simulation shell command
+    strArg = os.path.join(fldrActiveFiles, simFile)
+    listArgs.append(strArg)
+    
+    # Send shell command
+    #subprocess.call(listArgs)
+                
+    # Delete temporary simulation file from common project folder
+    os.remove(pathTempSim)            
+    
+    # Copy data files to resultsFolder
+    self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])                
+    
+    # Delete temporary model folder
+    shutil.rmtree(fldrActiveFiles)   
+    """
+        
         
 class AnimatLabSimulationRunner(object):
     """
@@ -179,7 +217,10 @@ class AnimatLabSimulationRunner(object):
                 os.remove(pathTempSim)            
                 
                 # Copy data files to resultsFolder
-                self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
+                self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])                
+                
+                # Delete temporary model folder
+                shutil.rmtree(fldrActiveFiles)                
         else:
             
             if cores > 0:
@@ -187,11 +228,9 @@ class AnimatLabSimulationRunner(object):
             else:
                 pool = multiprocessing.Pool()
                 
-            
-            
-            
-        # Delete temporary model folder
-        shutil.rmtree(fldrActiveFiles)
+            self.results = pool.map(runAnimatLabSimulation, os.listdir(self.simFiles))
+                
+
 
 
     def set_each_callback(self, fn):
