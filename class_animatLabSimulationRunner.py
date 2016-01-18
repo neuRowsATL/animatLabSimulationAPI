@@ -7,6 +7,9 @@ Description:     This class allows the user to run AnimatLab simulations from Py
 
 # Import dependencies
 import os, glob, shutil
+
+from copy import copy
+
 import subprocess
 import multiprocessing
 
@@ -57,6 +60,8 @@ def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     # Construct command to execute simulations
     programStr = os.path.join(obj_simRunner.sourceFiles, 'Animatsimulator')        
     listArgs = [programStr]
+    
+    return listArgs
     
     # Copy simulation file to common project folder
     pathOrigSim = os.path.join(obj_simRunner.simFiles, asimFile)
@@ -229,7 +234,7 @@ class AnimatLabSimulationRunner(object):
             else:
                 pool = multiprocessing.Pool()
                 
-            self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, self) for ix, filename in enumerate(os.listdir(self.simFiles))]) 
+            self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, copy(self)) for ix, filename in enumerate(os.listdir(self.simFiles)[0:15])]) 
                 
 
 
