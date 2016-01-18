@@ -87,7 +87,7 @@ class AnimatLabSimulationRunner(object):
         self.resultFiles = resultFiles
         
         
-    def do_simulation(self):
+    def do_simulation(self, cores=None):
         """
         do_simulation()
         
@@ -151,33 +151,36 @@ class AnimatLabSimulationRunner(object):
             print "\n========================="
         
         # Iterate through *.asim files and execute simulations
-        for simFile in os.listdir(self.simFiles):
-            if verbose > 1:
-                print "\n\nPROCESSING SIMULATION FILE: %s" % simFile
+        if cores is None:
+            for simFile in os.listdir(self.simFiles):
+                if verbose > 1:
+                    print "\n\nPROCESSING SIMULATION FILE: %s" % simFile
+                    
+                listArgs = [programStr]
                 
-            listArgs = [programStr]
-            
-            # Copy simulation file to common project folder
-            pathOrigSim = os.path.join(self.simFiles, simFile)
-            pathTempSim = os.path.join(fldrActiveFiles, simFile)
-            shutil.copy2(pathOrigSim, pathTempSim)
-            
-            # Create simulation shell command
-            strArg = os.path.join(fldrActiveFiles, simFile)
-            listArgs.append(strArg)
-            
-            ## For debugging
-            #print listArgs
-            #raw_input("Press <ENTER> to continue.")
-            
-            # Send shell command
-            #subprocess.call(listArgs)
-                        
-            # Delete temporary simulation file from common project folder
-            os.remove(pathTempSim)            
-            
-            # Copy data files to resultsFolder
-            self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
+                # Copy simulation file to common project folder
+                pathOrigSim = os.path.join(self.simFiles, simFile)
+                pathTempSim = os.path.join(fldrActiveFiles, simFile)
+                shutil.copy2(pathOrigSim, pathTempSim)
+                
+                # Create simulation shell command
+                strArg = os.path.join(fldrActiveFiles, simFile)
+                listArgs.append(strArg)
+                
+                ## For debugging
+                #print listArgs
+                #raw_input("Press <ENTER> to continue.")
+                
+                # Send shell command
+                #subprocess.call(listArgs)
+                            
+                # Delete temporary simulation file from common project folder
+                os.remove(pathTempSim)            
+                
+                # Copy data files to resultsFolder
+                self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
+        else:
+            raise ValueError("Number of cores MUST be specified!")
             
             
         # Delete temporary model folder
