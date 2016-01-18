@@ -228,7 +228,7 @@ class AnimatLabSimulationRunner(object):
             else:
                 pool = multiprocessing.Pool()
                 
-            self.results = pool.map(runAnimatLabSimulation, [(filename, self) for filename in os.listdir(self.simFiles)]) 
+            self.results = pool.map(runAnimatLabSimulationWrapper, [(filename, self) for filename in os.listdir(self.simFiles)]) 
                 
 
 
