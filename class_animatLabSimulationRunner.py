@@ -45,25 +45,26 @@ def runAnimatLabSimulationWrapper(args):
     return runAnimatLabSimulation(*args)
 
 
-def runAnimatLabSimulation(asimFile, obj_simRunner):
+def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     
-    return obj_simRunner.commonFiles
-    
-    """
     if verbose > 1:
         print "\n\nPROCESSING SIMULATION FILE: %s" % asimFile
+    
+    # Make a copy of common model files to use during simulations
+    fldrActiveFiles = os.path.join(obj_simRunner.rootFolder, obj_simRunner.name+'-'+str(fldrCount))
+    shutil.copytree(obj_simRunner.commonFiles, fldrActiveFiles)    
         
     # Construct command to execute simulations
-    programStr = os.path.join(self.sourceFiles, 'Animatsimulator')        
+    programStr = os.path.join(obj_simRunner.sourceFiles, 'Animatsimulator')        
     listArgs = [programStr]
     
     # Copy simulation file to common project folder
-    pathOrigSim = os.path.join(self.simFiles, simFile)
-    pathTempSim = os.path.join(fldrActiveFiles, simFile)
+    pathOrigSim = os.path.join(obj_simRunner.simFiles, asimFile)
+    pathTempSim = os.path.join(fldrActiveFiles, asimFile)
     shutil.copy2(pathOrigSim, pathTempSim)
     
     # Create simulation shell command
-    strArg = os.path.join(fldrActiveFiles, simFile)
+    strArg = os.path.join(fldrActiveFiles, asimFile)
     listArgs.append(strArg)
     
     # Send shell command
@@ -73,11 +74,11 @@ def runAnimatLabSimulation(asimFile, obj_simRunner):
     os.remove(pathTempSim)            
     
     # Copy data files to resultsFolder
-    self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])                
+    obj_simRunner._each_callback_fn(sourceFolder=fldrActiveFiles, name=asimFile.split('.')[0])                
     
     # Delete temporary model folder
     shutil.rmtree(fldrActiveFiles)   
-    """
+    
         
         
 class AnimatLabSimulationRunner(object):
@@ -149,17 +150,6 @@ class AnimatLabSimulationRunner(object):
             if len(glob.glob(os.path.join(self.commonFiles, '*.aproj'))) < 1:
                 raise AnimatLabSimRunnerError("No AnimatLab project files found in common files folder.\n%s" % self.commonFiles)
         
-        # Make a copy of common model files to use during simulations
-        fldrActiveFiles = os.path.join(self.rootFolder, self.name)
-        if os.path.isdir(fldrActiveFiles):
-            dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
-            count = 0
-            for d in dirs:
-                if os.path.isdir(os.path.join(self.rootFolder, d)):
-                    count += 1
-            fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
-        shutil.copytree(self.commonFiles, fldrActiveFiles)
-        
         # Check that source files with AnimatLab binaries exist
         if not os.path.isdir(self.sourceFiles):
             raise AnimatLabSimRunnerError("Source files folder does not exist!\n%s" % self.sourceFiles)
@@ -191,6 +181,17 @@ class AnimatLabSimulationRunner(object):
         
         # Iterate through *.asim files and execute simulations
         if cores is None:
+            # Make a copy of common model files to use during simulations
+            fldrActiveFiles = os.path.join(self.rootFolder, self.name)
+            if os.path.isdir(fldrActiveFiles):
+                dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
+                count = 0
+                for d in dirs:
+                    if os.path.isdir(os.path.join(self.rootFolder, d)):
+                        count += 1
+                fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
+            shutil.copytree(self.commonFiles, fldrActiveFiles)            
+            
             for simFile in os.listdir(self.simFiles):
                 if verbose > 1:
                     print "\n\nPROCESSING SIMULATION FILE: %s" % simFile
@@ -228,7 +229,7 @@ class AnimatLabSimulationRunner(object):
             else:
                 pool = multiprocessing.Pool()
                 
-            self.results = pool.map(runAnimatLabSimulationWrapper, [(filename, self) for filename in os.listdir(self.simFiles)]) 
+            self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, self) for ix, filename in enumerate(os.listdir(self.simFiles))]) 
                 
 
 
