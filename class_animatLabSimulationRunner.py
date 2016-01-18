@@ -8,6 +8,7 @@ Description:     This class allows the user to run AnimatLab simulations from Py
 # Import dependencies
 import os, glob, shutil
 import subprocess
+import multiprocessing
 
 global verbose
 verbose = 3
@@ -180,7 +181,13 @@ class AnimatLabSimulationRunner(object):
                 # Copy data files to resultsFolder
                 self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])
         else:
-            raise ValueError("Number of cores MUST be specified!")
+            
+            if cores > 0:
+                pool = multiprocessing.Pool(processes=cores)
+            else:
+                pool = multiprocessing.Pool()
+                
+            
             
             
         # Delete temporary model folder

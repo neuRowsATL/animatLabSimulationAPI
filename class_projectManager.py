@@ -167,4 +167,4 @@ class ProjectManager(object):
         
         """
         
-        self.simRunner.do_simulation()
+        self.simRunner.do_simulation(cores=-1)

@@ -107,9 +107,7 @@ if __name__ == '__main__':
     projMan.set_aproj(model)
     projMan.set_simRunner(sims)
     
-    projMan.make_asims(simSet)
-
-    1/0
+    #projMan.make_asims(simSet)
 
     projMan.run()
     """
