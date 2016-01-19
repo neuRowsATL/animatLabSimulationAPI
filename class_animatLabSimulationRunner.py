@@ -106,13 +106,21 @@ def runAnimatLabSimulation(fileCount, asimFile, obj_simRunner, mkdir=True):
         
     # Send shell command
     subprocess.call(listArgs)
-                
+    
+    # Copy data files to resultsFolder and get file names
+    results = obj_simRunner._each_callback_fn(sourceFolder=fldrActiveFiles, name=asimFile.split('.')[0])
+    
+    # Execute user-defined callback functions
+    for fn in obj_simRunner.each_callbacks:
+        print "RUNNING CALLBACK: %s" % fn
+        try:
+            fn(asimFile, results, obj_simRunner)
+        except:
+            print "ERROR RUNNING CALLBACK: %s" % fn
+    
     # Delete temporary simulation file from common project folder
     os.remove(pathTempSim)            
-    
-    # Copy data files to resultsFolder
-    obj_simRunner._each_callback_fn(sourceFolder=fldrActiveFiles, name=asimFile.split('.')[0])                
-    
+
     if mkdir:
         # Delete temporary model folder
         shutil.rmtree(fldrActiveFiles)   
@@ -153,7 +161,7 @@ class AnimatLabSimulationRunner(object):
         
         If resultFiles is left empty, simulation result data will be saved to the root folder.
         
-        Last updated:   January 4, 2016
+        Last updated:   January 19, 2016
         Modified by:    Bryce Chung
         """
         
@@ -164,6 +172,9 @@ class AnimatLabSimulationRunner(object):
 
         self.simFiles = simFiles
         self.resultFiles = resultFiles
+        
+        self.each_callbacks = []
+        self.master_callbacks = []
         
         
     def do_simulation(self, cores=None):
@@ -260,17 +271,18 @@ class AnimatLabSimulationRunner(object):
                 print "\n========================="
 
 
-    def set_each_callback(self, fn):
+    def add_each_callback(self, fn):
         """
         set_each_callback(fn)
         
         fn    User-defined callback function to execute after EACH simulation
         
-        Last updated:   January 4, 2016
+        Last updated:   January 19, 2016
         Modified by:    Bryce Chung
         """
         
-        pass
+        self.each_callbacks.append(fn)
+        return True
 
 
     def _each_callback_fn(self, sourceFolder='', name=''):
@@ -284,15 +296,22 @@ class AnimatLabSimulationRunner(object):
         Modified by:    Bryce Chung
         """
         
+        results = []
+        
         # Save chart result files to results folder
         for f in glob.glob(os.path.join(sourceFolder, '*.txt')):
             fname = str(name) + "_" + os.path.split(f)[-1].split('.')[0]
             ix = len(glob.glob(os.path.join( self.resultFiles, fname.split('.')[0]+'*.asim' )))
             if ix > 0:
                 fname += '-%i' % ix
-            shutil.copy2(f, os.path.join(self.resultFiles, fname))
+                
+            shutil.copy2(f, os.path.join(self.resultFiles, fname+'.txt'))
+            results.append(os.path.join(self.resultFiles, fname+'.txt'))
+            
             # Remove results file from commonFiles folder
             os.remove(f)
+            
+        return results
 
 
     def set_master_callback(self, fn):
@@ -301,8 +320,9 @@ class AnimatLabSimulationRunner(object):
         
         fn    User-defined callback function to execute after ALL simulations are complete
         
-        Last updated:   January 4, 2016
+        Last updated:   January 19, 2016
         Modified by:    Bryce Chung
         """
         
-        pass
+        self.master_callbacks.append(fn)
+        return True
