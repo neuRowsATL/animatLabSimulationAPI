@@ -30,30 +30,30 @@ if __name__ == '__main__':
     
     ## You can see other available methods by typing: model. + <tab>
     # See where the .asim XML file is saved -- this is the file that is loaded to generate the AnimatLab model object
-    model.asimFile
+    #model.asimFile
     
     # To find an element by its name:
-    PhasicDepMN = model.getElementByName("Phasic Dep MN")
+    #PhasicDepMN = model.getElementByName("Phasic Dep MN")
     
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
-    Neurons = model.getElementByType("Neurons")
+    #Neurons = model.getElementByType("Neurons")
     
     # To find elements by ID:
-    TonicLevMN = model.getElementByID("reallycomplicatedidhere")
+    #TonicLevMN = model.getElementByID("reallycomplicatedidhere")
     
     # Once you have selected the element that you want to update, you can see its available properties:
-    PhasicDepMN.getchildren()
+    #PhasicDepMN.getchildren()
     
     ## Note the name of each property as <Element '[NAME]' at [hexadecimal address]>
     # See what the value of the property is:
-    PhasicDepMN.find("Noise").text
+    #PhasicDepMN.find("Noise").text
     
     # Change the value of the property:
-    PhasicDepMN.find("Noise").text = '0.1'
+    #PhasicDepMN.find("Noise").text = '0.1'
     
     # Now that you've changed a property, save the updated model:
-    model.saveXML()
+    #model.saveXML()
     
     
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -62,11 +62,11 @@ if __name__ == '__main__':
     
     # Initiate AnimatLabSimulationRunner object
     sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
-        rootFolder = "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
-        commonFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
-        sourceFiles = "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
-        simFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \
-        resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/")
+        rootFolder = "F:/__DISSERTATION/SimulationFiles/_MASTER/", \ # Default folder for searching and saving
+        commonFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \ # Folder containing AnimatLab project files
+        sourceFiles = "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \ # Folder containing AnimatLab.exe
+        simFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \ # Folder containing .asim files
+        resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/") # Folder to save result files to
         
     
     # Execute AnimatLab simulations
@@ -97,19 +97,29 @@ if __name__ == '__main__':
     #print simSet.samplePts
     
     # Get the number of points in the parameter set
-    print "Sample size: %i" % simSet.get_size()
+    #print "Sample size: %i" % simSet.get_size()
     
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     ## EXAMPLE FOR USING ProjectManager CLASS
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     
+    # Instantiate ProjectManager object
     projMan = ProjectManager.ProjectManager('Test Project')
+    
+    # Assign the animatLabModel object
     projMan.set_aproj(model)
+    
+    # Assign the simulationSet object
     projMan.set_simRunner(sims)
     
-    #projMan.make_asims(simSet)
+    # Generate .asim files
+    print "\n\nMAKING ASIM FILES"
+    projMan.make_asims(simSet)
 
-    projMan.run()
-    """
-    NEED TO REWRITE SIMRUNNER CLASS TO DETERMINE WHETHER TO RUN SIMULATIONS BY GROUPS OF FILES OR BY FOLDER...
-    """
+    # Run simulations
+    # cores = None  >> Run simulations serially
+    # cores = +[#]  >> Use up to [#] of cores to run simulations in "parallel"
+    # cores = -1    >> Use maximum number of cores to run simulations in "parallel"
+    print "\n\nRUNNING ANIMATLAB SIMULATIONS"
+    projMan.run(cores=-1)
+
