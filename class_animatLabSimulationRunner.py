@@ -1,6 +1,6 @@
 """
 Created by:      Bryce Chung
-Last modified:   January 4, 2016
+Last modified:   January 19, 2016
 
 Description:     This class allows the user to run AnimatLab simulations from Python.
 """
