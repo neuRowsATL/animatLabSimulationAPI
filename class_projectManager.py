@@ -33,6 +33,7 @@ def saveAsimWrapper(args):
     
     return saveAsim(*args)
 
+
 def saveAsim(samplePt, obj_animatLabModel, fldrSimFiles, ix, indexLen=3, verbose=3):
     """
     saveAsim(samplePt, obj_animatLabModel, fldrSimFiles, ix, indexLen, verbose=3)
@@ -206,7 +207,7 @@ class ProjectManager(object):
             print "WRITING LOG FILE..."
             
         # Create the asims_log.csv log file for auditing purposes
-        f = open(self.projName + '-asims_log.csv', 'w')
+        f = open(os.path.join(self.simRunner.rootFolder, self.projName + '-asims_log.csv'), 'w')
         f.write(self.simRunner.simFiles+'\n')
         f.write(','.join(cols)+'\n')
         
