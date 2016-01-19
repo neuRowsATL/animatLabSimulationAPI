@@ -18,6 +18,8 @@ Description:     This class can upload and save data from text files generated b
 import os, glob
 import csv
 
+import traceback
+
 import numpy as np
 
 import multiprocessing
@@ -101,7 +103,7 @@ class chartData(object):
         queue.put((os.path.split(filename)[-1].split('.')[0], data))
 
         
-    def get_source(self, dataSource, analogChans=[], saveCSV=True):
+    def get_source(self, dataSource, analogChans=[], saveCSV=True, asDaemon=True):
         """
         Set data source.
         
@@ -117,19 +119,67 @@ class chartData(object):
         self.rawData = {}
         
         for d in dataSource:
-            try:
-                q = multiprocessing.Queue()
-                p = multiprocessing.Process(target=self._readCSV, args=((q,d,analogChans,verbose)))
-                p.start()
-                
-                data = q.get()
-                
-                q.close()
-                q.join_thread()
-                p.join()
-                
-            except:
-                raise            
+            if asDaemon:
+                try:
+                    q = multiprocessing.Queue()
+                    print "Opened multiprocessing.Queue"
+                    p = multiprocessing.Process(target=self._readCSV, args=((q,d,analogChans,verbose)))
+                    print "Set up multiprocessing.Process"
+                    p.start()
+                    
+                    print "Getting q data"
+                    data = q.get()
+                    
+                    print "Closing queue"
+                    q.close()
+                    q.join_thread()
+                    p.join()
+                    
+                except:
+                    print traceback.format_exc()
+                    raise            
+            else:
+                try:
+                    # Load CSV file
+                    if verbose > 0:
+                        print "\nLoading CSV data file: %s" % d
+                        
+                    csvData = []
+                    with open(d, 'r') as csvFile:
+                        csv.reader(csvFile)
+                        for row in csvFile:
+                            csvData.append(row.replace('\n','').split('\t'))
+                            
+                    csvFile.close()
+            
+                    # Filter and format CSV data
+                    spikeColNames = csvData[0]
+                    if verbose > 1:
+                        print "\nScrubbing data for null values..."
+                        
+                    delCols = []
+                    for ix, col in enumerate(spikeColNames):
+                        if verbose > 2:
+                            print "Col: %s" % col
+                        
+                        if col == '':
+                            delCols.append(ix)
+                            
+                    spikeData = np.delete(csvData, delCols, 1)[1:]
+                    spikeColNames = np.delete(spikeColNames, delCols)
+                    
+                    tempData = {}
+                    tempData['data'] = np.array(spikeData).astype(float).T
+                    tempData['spikeColNames'] = spikeColNames
+                    tempData['analogChans'] = analogChans        
+                    
+                    data = (os.path.split(d)[-1].split('.')[0], tempData)
+                    
+                except:
+                    if verbose > 2:
+                        print traceback.format_exc()
+                        raise
+                    
         
             self.rawData[data[0]] = data[1]
                 
@@ -147,9 +197,9 @@ class chartData(object):
         
         self.data = {}
         for d in self.rawData:
-            spikeData = self.rawData[d].data
-            spikeColNames = self.rawData[d].spikeColNames
-            analogChans = self.rawData[d].analogChans
+            spikeData = self.rawData[d]['data']
+            spikeColNames = self.rawData[d]['spikeColNames']
+            analogChans = self.rawData[d]['analogChans']
             
             if verbose > 1:
                 print "\nFormatting data to save memory!"
