@@ -64,11 +64,11 @@ def runAnimatLabSimulationWrapper(args):
     return runAnimatLabSimulation(*args)
 
 
-def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
+def runAnimatLabSimulation(fileCount, asimFile, obj_simRunner, mkdir=True):
     """
-    runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner)
+    runAnimatLabSimulation(fileCount, asimFile, obj_simRunner)
     
-    fldrCount      Integer used to increment file names to avoid overwriting data
+    fileCount      Integer used to increment file names to avoid overwriting data
     asimFile       File path for AnimatLab simulation file to run
     obj_simRunner  AnimatLabSimulationRunner object
     
@@ -86,9 +86,10 @@ def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     if verbose > 1:
         print "\n\nPROCESSING SIMULATION FILE: %s" % asimFile
     
-    # Make a copy of common model files to use during simulations
-    fldrActiveFiles = os.path.join(obj_simRunner.rootFolder, obj_simRunner.name+'-'+str(fldrCount))
-    shutil.copytree(obj_simRunner.commonFiles, fldrActiveFiles)    
+    if mkdir:
+        # Make a copy of common model files to use during simulations
+        fldrActiveFiles = os.path.join(obj_simRunner.rootFolder, obj_simRunner.name+'-'+str(fileCount))
+        shutil.copytree(obj_simRunner.commonFiles, fldrActiveFiles)    
         
     # Construct command to execute simulations
     programStr = os.path.join(obj_simRunner.sourceFiles, 'Animatsimulator')        
@@ -112,8 +113,9 @@ def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     # Copy data files to resultsFolder
     obj_simRunner._each_callback_fn(sourceFolder=fldrActiveFiles, name=asimFile.split('.')[0])                
     
-    # Delete temporary model folder
-    shutil.rmtree(fldrActiveFiles)   
+    if mkdir:
+        # Delete temporary model folder
+        shutil.rmtree(fldrActiveFiles)   
     
     return True
         
@@ -218,16 +220,25 @@ class AnimatLabSimulationRunner(object):
         if cores is None:            
             
             # Increment the file name if other simulation folders already exist
-            count = 0
-            if os.path.isdir(os.path.join(self.rootFolder, self.name)):
+            fldrActiveFiles = os.path.join(self.rootFolder, self.name)
+            if os.path.isdir(fldrActiveFiles):
+                count = 0
                 dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
                 for d in dirs:
                     if os.path.isdir(os.path.join(self.rootFolder, d)):
                         count += 1         
                         
+                fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
+                
+            # Make a copy of common model files to use during simulations
+            shutil.copytree(self.commonFiles, fldrActiveFiles)                           
+
             # Iterate through *.asim files and execute simulations            
             for simFile in os.listdir(self.simFiles):
-                runAnimatLabSimulation(count, simFile, self)
+                runAnimatLabSimulation(count, simFile, self, mkdir=False)
+                
+            # Delete temporary model folder
+            shutil.rmtree(fldrActiveFiles)                 
                 
         else:
             # If a positive number of cores is given, use that number of cores
