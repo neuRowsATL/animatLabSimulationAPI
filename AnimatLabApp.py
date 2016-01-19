@@ -9,13 +9,43 @@ import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 import class_simulationSet as SimulationSet
 import class_projectManager as ProjectManager
+import class_chartData as ChartData
 
 import numpy as np
+
+import os
+import traceback
 
 import class_chartData as chartData
 
 global verbose
 verbose = 3
+
+
+# Define callback function before the __main__ loop in order to ensure that
+# it has global scope. Defining it within the __main__ loop will result in
+# a runtime error!
+#
+# Callbacks must accept arguments: asimFile, results, obj_simRunner
+def callback_compressData(asimFile, results, obj_simRunner):
+    # Instantiate chartData object with unique name
+    chartData = ChartData.chartData('Example1')
+
+    print results
+    chartData.get_source(results, saveCSV=False, asDaemon=False)
+    
+    print "\nCompressing: %s" % asimFile
+    # Reduce the impact on memory by compressing spike data channels
+    chartData.compress()
+    
+    print "\nSaving chart data: %s" % asimFile
+    # Save compressed data to a data file using default naming options
+    try:
+        dataName = os.path.split(asimFile)[-1].split('.')[0]
+        chartData.saveData(filename=os.path.join(obj_simRunner.resultFiles, dataName+'.dat'))
+    except:
+        if verbose > 2:
+            print traceback.format_exc()
 
 
 ## This allows the program to utilize multiprocessing functionality for higher efficiency
@@ -63,12 +93,17 @@ if __name__ == '__main__':
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     
     # Initiate AnimatLabSimulationRunner object
+    # rootFolder   Default folder for searching and saving
+    # commonFiles  Folder containing AnimatLab project files
+    # sourceFiles  Folder containing AnimatLab.exe
+    # simFiles     Folder containing .asim files
+    # resultfiles  Folder to save result files to
     sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims", \
-        rootFolder = "F:/__DISSERTATION/SimulationFiles/_MASTER/", \ # Default folder for searching and saving
-        commonFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \ # Folder containing AnimatLab project files
-        sourceFiles = "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \ # Folder containing AnimatLab.exe
-        simFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \ # Folder containing .asim files
-        resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/") # Folder to save result files to
+        rootFolder = "F:/__DISSERTATION/SimulationFiles/_MASTER/", \
+        commonFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel/", \
+        sourceFiles = "C:/Program Files (x86)/NeuroRobotic Technologies/AnimatLab/bin", \
+        simFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/SimFiles/", \
+        resultFiles = "F:/__DISSERTATION/SimulationFiles/_MASTER/") 
         
     
     # Execute AnimatLab simulations
@@ -84,8 +119,8 @@ if __name__ == '__main__':
     simSet = SimulationSet.SimulationSet()
     
     # Generate the range of parameter values as a list-like object
-    paramRange1 = np.arange(0, 13.5, 0.5)
-    paramRange2 = np.arange(0, 13.5, 0.5)
+    paramRange1 = np.arange(0, 13.5, 3.)
+    paramRange2 = np.arange(0, 13.5, 5.)
     
     # Add the parameter ranges and generate the combinations
     simSet.set_by_range({'OXO CPG.TonicStimulus': paramRange1, 'OXO ARIN.TonicStimulus': paramRange2})
@@ -100,6 +135,42 @@ if __name__ == '__main__':
     
     # Get the number of points in the parameter set
     #print "Sample size: %i" % simSet.get_size()
+    
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+    ## EXAMPLE OF USE FOR chartData CLASS
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====    
+    
+    # Instantiate chartData object with unique name
+    #chartData = ChartData.chartData('Example1')
+    
+    ## AnimatLab CSV data files can be loaded individually or in groups
+    #chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel_Standalone-14_Afferents.txt", \
+                         #analogChans = ['CB_joint'], \
+                         #saveCSV=True)
+    #chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel_Standalone-14_Circuit.txt", \
+                         #analogChans = ['CB_joint'], \
+                         #saveCSV=True)
+    
+    #chartData.get_source(["F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel_Standalone-14_Afferents.txt", \
+       #"F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel_Standalone-14_Circuit.txt"])
+    
+    # Reduce the impact on memory by compressing spike data channels
+    #chartData.compress()
+    
+    # Save compressed data to a data file using default naming options
+    #chartData.saveData(filename='F:/__DISSERTATION/SimulationFiles/_MASTER/ChartData-FinalDissertationModel_Standalone-14.dat')
+    
+    # Load data from saved file using the same unique chartData object name
+    #chartData.loadData()    
+    
+    
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+    ## EXAMPLE FOR USING ChartData CLASS FOR CALLBACK
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====   
+        
+    # Attach the callback to the simRunner class object
+    sims.add_each_callback(callback_compressData)
+    
     
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     ## EXAMPLE FOR USING ProjectManager CLASS
@@ -125,28 +196,4 @@ if __name__ == '__main__':
     print "\n\nRUNNING ANIMATLAB SIMULATIONS"
     projMan.run(cores=-1)
 
-
-
-## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-## EXAMPLE OF USE FOR chartData CLASS
-## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-
-# Instantiate chartData object with unique name
-chartData = chartData('Example1')
-
-## AnimatLab CSV data files can be loaded individually or in groups
-chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/Afferents.txt")
-chartData.get_source("F:/__DISSERTATION/SimulationFiles/_MASTER/Circuit.txt")
-
-# chartData.get_source(["F:/__DISSERTATION/SimulationFiles/_MASTER/Afferents.txt", \
-#    "F:/__DISSERTATION/SimulationFiles/_MASTER/Circuit.txt"])
-
-# Reduce the impact on memory by compressing spike data channels
-chartData.compress()
-
-# Save compressed data to a data file using default naming options
-chartData.saveData()
-
-# Load data from saved file using the same unique chartData object name
-chartData.loadData()
-
+    
