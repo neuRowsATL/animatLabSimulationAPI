@@ -45,10 +45,43 @@ class AnimatLabSimRunnerError(Exception):
         return repr(self.value)
         
 def runAnimatLabSimulationWrapper(args):
+    """
+    runAnimatLabSimulationWrapper(args)
+    
+    args        Ordered iterable of arguments: fldrCount, asimFile, obj_simRunner
+
+    
+    DESCRIPTION
+    This is a wrapper class to manage the parallelization of runAnimatLabSimulation().
+    
+    The multiprocessing.Pool.map function can only pass a single argument to its
+    callable function. Thus, this wrapper class 'dereferences' the tuple of arguments
+    to assign them to the appropriate arguments for runAnimatLabSimulation().
+    
+    Last updated:   January 19, 2016
+    Modified by:    Bryce Chung
+    """
     return runAnimatLabSimulation(*args)
 
 
 def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
+    """
+    runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner)
+    
+    fldrCount      Integer used to increment file names to avoid overwriting data
+    asimFile       File path for AnimatLab simulation file to run
+    obj_simRunner  AnimatLabSimulationRunner object
+    
+    
+    DESCRIPTION
+    In order to use the multiprocessing methods, the functions that are passed to it as
+    arguments need to be "pickle-able." Defining runAnimatLabSimulation as its own 
+    function in global namespace circumvented a bug that was occurring when trying to
+    call an animatLabSimulationRunner method.
+    
+    Last updated:   January 19, 2016
+    Modified by:    Bryce Chung
+    """
     
     if verbose > 1:
         print "\n\nPROCESSING SIMULATION FILE: %s" % asimFile
@@ -61,19 +94,17 @@ def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     programStr = os.path.join(obj_simRunner.sourceFiles, 'Animatsimulator')        
     listArgs = [programStr]
     
-    return listArgs
-    
     # Copy simulation file to common project folder
     pathOrigSim = os.path.join(obj_simRunner.simFiles, asimFile)
-    pathTempSim = os.path.join(fldrActiveFiles, asimFile)
+    pathTempSim = os.path.join(fldrActiveFiles, asimFile)  
     shutil.copy2(pathOrigSim, pathTempSim)
     
     # Create simulation shell command
     strArg = os.path.join(fldrActiveFiles, asimFile)
     listArgs.append(strArg)
-    
+        
     # Send shell command
-    #subprocess.call(listArgs)
+    subprocess.call(listArgs)
                 
     # Delete temporary simulation file from common project folder
     os.remove(pathTempSim)            
@@ -84,6 +115,7 @@ def runAnimatLabSimulation(fldrCount, asimFile, obj_simRunner):
     # Delete temporary model folder
     shutil.rmtree(fldrActiveFiles)   
     
+    return True
         
         
 class AnimatLabSimulationRunner(object):
@@ -140,7 +172,7 @@ class AnimatLabSimulationRunner(object):
         2. Run simulations and post process data as simulations are completed
         3. Remove temporary files and folders
         
-        Last updated:   January 4, 2016
+        Last updated:   January 19, 2016
         Modified by:    Bryce Chung
         """
         
@@ -176,67 +208,45 @@ class AnimatLabSimulationRunner(object):
             if not os.path.isdir(self.resultFiles):
                 os.makedirs(self.resultFiles)        
         
-        # Construct command to execute simulations
-        programStr = os.path.join(self.sourceFiles, 'Animatsimulator')
-        
         if verbose > 1:
             print "\n\n========================="
             print "\nSIMULATION SERIES: %s" % self.name
             print "\n========================="
         
-        # Iterate through *.asim files and execute simulations
-        if cores is None:
-            # Make a copy of common model files to use during simulations
-            fldrActiveFiles = os.path.join(self.rootFolder, self.name)
-            if os.path.isdir(fldrActiveFiles):
+
+        # If no core count has been given, default to run simulations in serial order
+        if cores is None:            
+            
+            # Increment the file name if other simulation folders already exist
+            count = 0
+            if os.path.isdir(os.path.join(self.rootFolder, self.name)):
                 dirs = [d for d in os.listdir(self.rootFolder) if self.name in d]
-                count = 0
                 for d in dirs:
                     if os.path.isdir(os.path.join(self.rootFolder, d)):
-                        count += 1
-                fldrActiveFiles = os.path.join(self.rootFolder, self.name+'-'+str(count))
-            shutil.copytree(self.commonFiles, fldrActiveFiles)            
-            
+                        count += 1         
+                        
+            # Iterate through *.asim files and execute simulations            
             for simFile in os.listdir(self.simFiles):
-                if verbose > 1:
-                    print "\n\nPROCESSING SIMULATION FILE: %s" % simFile
-                    
-                listArgs = [programStr]
+                runAnimatLabSimulation(count, simFile, self)
                 
-                # Copy simulation file to common project folder
-                pathOrigSim = os.path.join(self.simFiles, simFile)
-                pathTempSim = os.path.join(fldrActiveFiles, simFile)
-                shutil.copy2(pathOrigSim, pathTempSim)
-                
-                # Create simulation shell command
-                strArg = os.path.join(fldrActiveFiles, simFile)
-                listArgs.append(strArg)
-                
-                ## For debugging
-                #print listArgs
-                #raw_input("Press <ENTER> to continue.")
-                
-                # Send shell command
-                #subprocess.call(listArgs)
-                            
-                # Delete temporary simulation file from common project folder
-                os.remove(pathTempSim)            
-                
-                # Copy data files to resultsFolder
-                self._each_callback_fn(sourceFolder=fldrActiveFiles, name=simFile.split('.')[0])                
-                
-                # Delete temporary model folder
-                shutil.rmtree(fldrActiveFiles)                
         else:
-            
+            # If a positive number of cores is given, use that number of cores
             if cores > 0:
-                pool = multiprocessing.Pool(processes=cores)
+                cpu = min((multiprocessing.cpu_count(), cores))
+                pool = multiprocessing.Pool(processes=cpu)
+            # If a negative number of cores is given, -1, use ALL available cores
             else:
                 pool = multiprocessing.Pool()
                 
-            self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, copy(self)) for ix, filename in enumerate(os.listdir(self.simFiles)[0:15])]) 
-                
+            # Map the set of simulations to the multiprocessing pool
+            ## A wrapper function is used here because the multiprocessing.Pool.map method
+            ## can only pass a single argument to its callable function.
+            self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, copy(self)) for ix, filename in enumerate(os.listdir(self.simFiles))]) 
 
+            if verbose > 1:
+                print "\n\n========================="
+                print "\nSIMULATION SERIES COMPLETE: %s" % self.name
+                print "\n========================="
 
 
     def set_each_callback(self, fn):
