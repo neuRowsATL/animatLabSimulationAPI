@@ -3,17 +3,27 @@ Created by:      Bryce Chung
 Last modified:   January 4, 2016
 """
 
+import matplotlib.pyplot as plt
+
+
+plt.ion()
+
+global verbose
+verbose = 3
+
 class chartViz(object):
     """
     This class is used to visualize chartData objects.
     """
     
     def __init__(self):
-        self.data = args()
+        self.data = {}
         self.fig = None
-        self.axes = args()
+        self.axes = {}
         self.arrange = None
         self.chartFormat = None
+        self.title = ''
+        self.titleFormat = {}
         
         
     def add_data(self, name, objChartData):
@@ -26,10 +36,15 @@ class chartViz(object):
         
     def set_format(self, chartFormat):
         self.chartFormat = chartFormat
+        
+    def set_title(self, title, titleFormat = {}):
+        self.title = title
+        self.titleFormat = titleFormat
     
     
     def make_chart(self, hide=['Time']):
         self.fig = plt.figure(figsize=(24,18))
+        self.fig.suptitle(self.title, **self.titleFormat)
                 
         axShare = None        
         
@@ -40,6 +55,7 @@ class chartViz(object):
                 
             i=1        
             for dAxis in self.data:
+                print "\n"
                 for d in dAxis.keys():
                     if d in hide:
                         continue
@@ -49,7 +65,7 @@ class chartViz(object):
                         print "Shared:"
                         print axShare
                         
-                    if len(self.axes) > 1:
+                    if len(self.axes) > 0:
                         ax = self.fig.add_subplot(axLen, 1, i, sharex=axShare)
                     else:
                         ax = self.fig.add_subplot(axLen, 1, i)
@@ -70,16 +86,16 @@ class chartViz(object):
                     i += 1
         else:
             for ix, axis in enumerate(self.arrange):                
-                                   
-                if len(self.axes) > 1:
+                print "\n"
+                if len(self.axes) > 0:
                     ax = self.fig.add_subplot(len(self.arrange), 1, ix+1, sharex=axShare)
-                    print "Sharing axis"
+                    print "Sharing axis: %s" % str(axShare)
                 else:
                     ax = self.fig.add_subplot(len(self.arrange), 1, ix+1)
                     print "No shared axis"
                     axShare = ax
                     
-                for ix, chart in enumerate(self.arrange[axis].charts):
+                for ix, chart in enumerate(self.arrange[axis]['charts']):
                     if chart.split('.')[1:] in hide:
                         continue
 
@@ -94,7 +110,7 @@ class chartViz(object):
                     if chart in self.chartFormat.keys():
                         formatting = self.chartFormat[chart]
                         if 'color' in formatting.keys():
-                            kwargs['color'] = self.chartFormat[chart].color
+                            kwargs['color'] = self.chartFormat[chart]['color']
                     
                     if verbose > 1:
                         print "Charting: %s" % chart
@@ -104,19 +120,19 @@ class chartViz(object):
                     strChart = ''.join(chart.split('.')[1:])
                     data = self.data[strDataObj]
                     
-                    if data[strChart].datatype == 'analog':
-                        ax.plot(data['Time'].data, data[strChart].data, **kwargs)
-                    elif data[strChart].datatype == 'spike':
-                        if len(self.arrange[axis].charts) > 1:
-                            height = 1./len(self.arrange[axis].charts)
+                    if data[strChart]['datatype'] == 'analog':
+                        ax.plot(data['Time']['data'], data[strChart]['data'], **kwargs)
+                    elif data[strChart]['datatype'] == 'spike':
+                        if len(self.arrange[axis]['charts']) > 1:
+                            height = 1./len(self.arrange[axis]['charts'])
                         else:
                             height = 1
                         
-                        for spike in data[strChart].data:
+                        for spike in data[strChart]['data']:
                             ax.axvline(spike, ymin=ix*height, ymax=(ix+1)*height-height*0.1, **kwargs)
                             ax.yaxis.set_ticklabels([])
                             
-                ax.set_ylabel(self.arrange[axis].name)
+                ax.set_ylabel(self.arrange[axis]['name'])
                             
                 if ix+1 < len(self.arrange):
                     ax.xaxis.set_ticklabels([])
