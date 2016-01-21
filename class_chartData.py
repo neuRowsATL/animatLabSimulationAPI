@@ -209,7 +209,7 @@ class chartData(object):
                     print "\n\nProcessing column: %s" % spikeColNames[ix]
                     
                 tempData = {}
-                if (col in analogChans) or (col == 'Time'):
+                if (col in analogChans) or (col in ['Time', 'TimeSlice']):
                     if verbose > 1:
                         print "Channel type: Analog"
                     tempData['data'] = spikeData[ix]
@@ -217,7 +217,7 @@ class chartData(object):
                 else:
                     if verbose > 1:
                         print "Channel type: Spike"
-                    tempData['data'] = spikeData[0][np.where(spikeData[ix] == 1)[0]]
+                    tempData['data'] = spikeData[1][np.where(spikeData[ix] == 1)[0]]
                     tempData['datatype'] = 'spike'
                     
                 if verbose > 2:
