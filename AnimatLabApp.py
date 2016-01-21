@@ -8,13 +8,16 @@ Last modified:   December 31, 2015
 import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 import class_simulationSet as SimulationSet
+
 import class_projectManager as ProjectManager
+
 import class_chartData as ChartData
+import class_chartViz as ChartViz
 
 import numpy as np
 
-import os
-import traceback
+import os, traceback
+from copy import copy
 
 import class_chartData as chartData
 
@@ -32,7 +35,7 @@ def callback_compressData(asimFile, results, obj_simRunner):
     chartData = ChartData.chartData('Example1')
 
     print results
-    chartData.get_source(results, saveCSV=False, asDaemon=False)
+    chartData.get_source(results, analogChans=['CB_joint'], saveCSV=False, asDaemon=False)
     
     print "\nCompressing: %s" % asimFile
     # Reduce the impact on memory by compressing spike data channels
@@ -127,7 +130,7 @@ if __name__ == '__main__':
     
     # This operation can be done in one line (as above) or separately
     # Each addition of parameters generates the new combinations when added
-    # simSet.set_by_range({'a': paramRange1})
+    #simSet.set_by_range({'a': paramRange1})
     # simSet.set_by_range({'b': paramRange2})
     
     # Print the set the sample points
@@ -196,4 +199,80 @@ if __name__ == '__main__':
     print "\n\nRUNNING ANIMATLAB SIMULATIONS"
     projMan.run(cores=-1)
 
+
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+    ## EXAMPLE FOR USING ChartViz CLASS
+    ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+    x = ChartData.chartData('Test')
+    x.loadData('F:/__DISSERTATION/SimulationFiles/_MASTER/FinalDissertationModel_Standalone-15.dat')
     
+    arrange = {}
+    arrange[0] = {}
+    arrange[0]['name'] = 'Movement'
+    arrange[0]['charts'] = ['Data.CB_joint']
+    
+    arrange[1] = {}
+    arrange[1]['name'] = 'Dep CPG'
+    arrange[1]['charts'] = ['Data.Phasic Dep MN', 'Data.Tonic Dep MN', 'Data. Dep IN']
+    
+    arrange[2] = {}
+    arrange[2]['name'] = 'Lev CPG'
+    arrange[2]['charts'] = ['Data.Phasic Lev  MN', 'Data.Tonic Lev MN', 'Data. Lev IN']
+    
+    arrange[3] = {}
+    arrange[3]['name'] = 'ARINs'
+    arrange[3]['charts'] = ['Data.Stretch ARIN', 'Data.Stretch ARCIN', 'Data.Release ARIN', 'Data.Release ARCIN']
+    
+    arrange[4] = {}
+    arrange[4]['name'] = 'PADIs'
+    arrange[4]['charts'] = ['Data.Lev PADI', 'Data.Dep PADI']
+    
+    arrange[5] = {}
+    arrange[5]['name'] = 'Afferents'
+    arrange[5]['charts'] = ['Data.Stretch Rate Resist Afferent', 'Data.Stretch Rate Assist Afferent', 'Data.Stretch Rate X Inhib',
+                         'Data.Release Rate Resist Afferent', 'Data.Release Rate Assist Afferent', 'Data.Release Rate X Inhib']
+    
+    
+    chartFormat = {}
+    form = {}
+    
+    form['color'] = '#339900'
+    chartFormat['Data.CB_joint'] = copy(form)
+    
+    form['color'] = '#CC0000'
+    chartFormat['Data.Phasic Dep MN'] = copy(form)
+    chartFormat['Data.Tonic Dep MN'] = copy(form)
+    chartFormat['Data. Dep IN'] = copy(form)
+    
+    form['color'] = '#0000CC'
+    chartFormat['Data.Phasic Lev MN'] = copy(form)
+    chartFormat['Data.Tonic Lev MN'] = copy(form)
+    chartFormat['Data Lev IN'] = copy(form)
+    
+    form['color'] = '#9900CC'
+    chartFormat['Data.Stretch ARIN'] = copy(form)
+    chartFormat['Data.Stretch ARCIN'] = copy(form)
+    chartFormat['Data.Stretch Rate Resist Afferent'] = copy(form)
+    chartFormat['Data.Stretch Rate Assist Afferent'] = copy(form)
+    chartFormat['Data.Stretch Rate X Inhib'] = copy(form)
+    
+    form['color'] = '#00FFFF'
+    chartFormat['Data.Release ARIN'] = copy(form)
+    chartFormat['Data.Release ARCIN'] = copy(form)
+    chartFormat['Data.Release Rate Resist Afferent'] = copy(form)
+    chartFormat['Data.Release Rate Assist Afferent'] = copy(form)
+    chartFormat['Data.Release Rate X Inhib'] = copy(form)
+    
+    
+    
+    viz = ChartViz.chartViz()
+    viz.add_data('Data', x)
+    
+    viz.set_title('CPG = 12.0 & ARIN = 10.0', titleFormat={'fontsize': 32, 'fontweight': 'bold'})
+    
+    viz.set_arrange(arrange)
+    viz.set_format(chartFormat)    
+    
+    viz.make_chart()
+        
+        
