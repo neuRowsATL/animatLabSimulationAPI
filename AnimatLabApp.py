@@ -166,6 +166,9 @@ if __name__ == '__main__':
     # Load data from saved file using the same unique chartData object name
     #chartData.loadData()    
     
+    # Show data channel names
+    #chartData.data.keys()
+    
     
     ## ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     ## EXAMPLE FOR USING ChartData CLASS FOR CALLBACK
