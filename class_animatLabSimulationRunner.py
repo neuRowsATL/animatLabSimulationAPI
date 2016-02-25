@@ -264,6 +264,8 @@ class AnimatLabSimulationRunner(object):
             ## A wrapper function is used here because the multiprocessing.Pool.map method
             ## can only pass a single argument to its callable function.
             self.results = pool.map(runAnimatLabSimulationWrapper, [(ix, filename, copy(self)) for ix, filename in enumerate(os.listdir(self.simFiles))]) 
+            pool.close()
+            pool.join()
 
             if verbose > 1:
                 print "\n\n========================="
