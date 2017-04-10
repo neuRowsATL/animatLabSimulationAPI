@@ -221,10 +221,10 @@ class AnimatLabSimulationRunner(object):
             if not os.path.isdir(self.resultFiles):
                 os.makedirs(self.resultFiles)        
         
-        if verbose > 1:
-            print "\n\n========================="
-            print "\nSIMULATION SERIES: %s" % self.name
-            print "\n========================="
+        #if verbose > 1:
+        #    print "\n\n========================="
+        #    print "\nSIMULATION SERIES: %s" % self.name
+        #    print "\n========================="
         
 
         # If no core count has been given, default to run simulations in serial order
@@ -267,10 +267,10 @@ class AnimatLabSimulationRunner(object):
             pool.close()
             pool.join()
 
-            if verbose > 1:
-                print "\n\n========================="
-                print "\nSIMULATION SERIES COMPLETE: %s" % self.name
-                print "\n========================="
+            #if verbose > 1:
+            #    print "\n\n========================="
+            #    print "\nSIMULATION SERIES COMPLETE: %s" % self.name
+            #    print "\n========================="
 
 
     def add_each_callback(self, fn):
