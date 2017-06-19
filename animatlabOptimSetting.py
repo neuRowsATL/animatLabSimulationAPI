@@ -3,6 +3,9 @@
 Created on Wed Mar 01 10:25:16 2017
 Command board to select stimuli and synapses to optimize
 version 14
+
+Modified by cattaert June 08 2017
+     Disabled list of synapses corrected line 492 & line 510    
 @author: cattaert
 """
 
@@ -436,7 +439,7 @@ class OptimizeSimSettings():
         self.disabledSynNames = []
         for i in self.disabledSynNbs:
             self.disabledSynNames.append(self.connexName[i])
-        
+
         self.dontChangeSynFRNbs = self.paramOpt['dontChangeSynFRNbs']
         self.dontChangeSynFRNames = []
         for i in self.dontChangeSynFRNbs:
@@ -486,7 +489,7 @@ class OptimizeSimSettings():
         self.synList = []
         for syn in range(len(self.synsTot)):
             synRank = self.synsTot[syn]
-            if synRank not in self.dontChangeSynNbs:
+            if synRank not in self.disabledSynNbs:
                 self.synList.append(synRank)
         self.synsTot = self.synList  # excluded syns are removed from the list
         self.orderedsynsTot = []
@@ -504,7 +507,7 @@ class OptimizeSimSettings():
         self.synListFR = []
         for syn in range(len(self.synsTotFR)):
             synRank = self.synsTotFR[syn]
-            if synRank not in self.dontChangeSynFRNbs:
+            if synRank not in self.disabledSynFRNbs:
                 self.synListFR.append(synRank)
         self.synsTotFR = self.synListFR  # excluded syns are removed from list
         self.orderedsynsTotFR = []

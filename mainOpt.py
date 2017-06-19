@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jan 23 10:11:19 2017
-
+Modified June 7 2017
+    in procedure "loadParams", the actual number of Loeb params is set to 41
 @author: cattaert
 """
 import class_animatLabModel as AnimatLabModel
@@ -13,20 +14,21 @@ import class_projectManager as ProjectManager
 # import xml.etree.ElementTree as elementTree
 # from random import shuffle
 import os
+import pickle
 # import random
 from FoldersArm import FolderOrg
 from animatlabOptimSetting import OptimizeSimSettings
-from animatlabOptimSetting import loadParams
 from optimization import runMarquez, setPlaybackControlMode
 from optimization import improveSynapses, improveSynapsesFR, improveStims
 # from optimization import enableStims, formTemplateSmooth, savecurve
-from optimization import affichExtStim, affichConnexions, affichConnexionsFR
+# from optimization import affichExtStim, affichConnexions, affichConnexionsFR
 # from optimization import affichChartColumn, affichNeurons
 # from optimization import affichNeuronsFR, liste
 from optimization import writeTitres, tablo, findChartName, findTxtFileName
 from optimization import savechartfile, writeBestResSuite
 from optimization import writeaddTab, testquality, copyRenameFile
-from optimization import getSimSetFromAsim, getlistparam
+from optimization import getSimSetFromAsim
+# from optimization import getlistparam
 from cma import fmin
 
 
@@ -48,6 +50,40 @@ if not os.path.exists(folders.animatlab_result_dir):
 
 if not os.path.exists(folders.animatlab_simFiles_dir):
         os.makedirs(folders.animatlab_simFiles_dir)
+
+
+def loadParams(paramFicName, optSet):
+        try:
+            print "looking paramOpt file:", paramFicName
+            with open(paramFicName, 'rb') as input:
+                optSet.paramLoebName = pickle.load(input)
+                optSet.paramLoebValue = pickle.load(input)
+                optSet.paramLoebType = pickle.load(input)
+                optSet.paramLoebCoul = pickle.load(input)
+                optSet.paramMarquezName = pickle.load(input)
+                optSet.paramMarquezValue = pickle.load(input)
+                optSet.paramMarquezType = pickle.load(input)
+                optSet.paramMarquezCoul = pickle.load(input)
+            print "nb loaded param :", len(optSet.paramLoebName)
+            # print "nb actual param:", len(listparNameOpt)
+            print "nb actual param:", 41
+            # There are 41 Loeb parameters in this version
+            if len(optSet.paramLoebName) == 41:
+                print "paramOpt :"
+                optSet.printParams(optSet.paramLoebName, optSet.paramLoebValue)
+                print "paramMarquez :"
+                optSet.printParams(optSet.paramMarquezName,
+                                   optSet.paramMarquezValue)
+                print '====  Param loaded  ===='
+                response = True
+            else:
+                print "Mismatch between existing and actual parameter files"
+                response = False
+        except:
+            print "No parameter file with this name in the directory"
+            print "NEEDs to create a new parameter file"
+            response = False
+        return response
 
 
 def saveparams(filename):
@@ -136,7 +172,7 @@ def saveparams(filename):
     comment = ""
     writeaddTab(folders, listparnam, filename, 'w', comment, 0)
     writeaddTab(folders, listparval, filename, 'a', comment, 0)
-
+ 
 
 # ============================================================================
 #                               MAIN PROGRAM
@@ -156,6 +192,7 @@ if __name__ == '__main__':
     optSet = OptimizeSimSettings(folders=folders, model=model,
                                  projMan=projMan, sims=sims)
     print
+    listparNameOpt = optSet.paramLoebName
     setPlaybackControlMode(model, mode=0)
     # Looks for a parameter file in the chosen directory
     fileName = 'paramOpt.pkl'
