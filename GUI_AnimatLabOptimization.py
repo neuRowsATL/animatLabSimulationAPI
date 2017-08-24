@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+# GUI_AnimatLabOptimization
+# version 08
 """
 Created on Wed Mar 29 15:38:45 2017
 GUI for animatLab model optimization
@@ -16,41 +17,223 @@ Modified June 7 2017
 
     in procedure "browse_folder":
     doublet values and names are now avoided in exConn, exConnFR and exStim
-    and in optSet.disabledSynNames, optSet.disabledSynFRNames and
-    optSet.disabledStimNames
+    and in self.optSet.disabledSynNames, self.optSet.disabledSynFRNames and
+    self.optSet.disabledStimNames
 Modified June 8 2017
     added a nex checkbox column in chart for mvt
+Modified June 29,2017
+    This GUI soft is now upgraded to work with PyQt5
+Modified July 17, 2017
+    def browse_folder(self):(line 575): function modified to extract both
+    rootname and subdir from readAnimatLabDir() (a function that reads the
+    path to the previous animatlab simulation visited. The name of the file is
+    "animatlabSimDir.txt" that is stored in the AnimatLabSimulationAPI folder)
+    This function has been added line 75
+modified July 17,2017
+    lines 441: added some commands to avoid a problem with a procedure called
+    animatlabOptimSetting  (self.optSet.actualizeparamMarquez)
+        self.optSet.mnColChartNbs = self.optSet.paramMarquez['mnColChartNbs']
+        self.optSet.mnColChartNames = []
+        for i in self.optSet.mnColChartNbs:
+            self.optSet.mnColChartNames.append(self.optSet.chartColNames[i])
+        print self.optSet.mnColChartNames
+    now the list of mnColChartNames is actualized.
+modified August 18 2017
+    self.optSet is now defined as self.optSet in class ReadAsimAform
+modified August 22 2017
+    procedure to choose twitStMusclesStNbs is now implemented
 @author: cattaert
 """
 
-from PyQt4 import QtGui  # Import the PyQt4 module we'll need
-from PyQt4 import QtCore
-# from PyQt4.QtGui import QListWidgetItem, QHeaderView
-from PyQt4.QtCore import QSize
-import sys  # We need sys so that we can pass argv to QApplication
-import design3  # This file holds our MainWindow and all design related things
-# it also keeps events etc that we defined in Qt Designer
-import os  # For listing directory methods
+# -*- coding: utf-8 -*-
+# pylint: disable=E1101
 
+from functools import partial
+import sys  # We need sys so that we can pass argv to QApplication
+import os  # For listing directory methods
 import pickle
+import design  # This file holds our MainWindow and all design related things
+# it also keeps events etc that we defined in Qt Designer
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QSize
+# from PyQt5.QtCore import QDir, Qt
+# from PyQt5.QtGui import QFont, QPalette
+from PyQt5.QtWidgets import (QDialog,
+                             QErrorMessage, QFrame,
+                             QGridLayout, QInputDialog, QLabel,
+                             QPushButton)
+# from PyQt5.QtWidgets import (QApplication, QCheckBox, QColorDialog, QDialog,
+#                              QErrorMessage, QFileDialog, QFontDialog, QFrame,
+#                              QGridLayout, QInputDialog, QLabel, QLineEdit,
+#                              QMessageBox, QPushButton)
+
 
 import class_animatLabModel as AnimatLabModel
 import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 from animatlabOptimSetting import OptimizeSimSettings
 from FoldersArm import FolderOrg
-folders = FolderOrg()
+# folders = FolderOrg()
+
 try:
-    _encoding = QtGui.QApplication.UnicodeUTF8
+    _encoding = QtWidgets.QApplication.UnicodeUTF8
 
     def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig, _encoding)
+        return QtWidgets.QApplication.translate(context,
+                                                text,
+                                                disambig,
+                                                _encoding)
 except AttributeError:
     def _translate(context, text, disambig):
-        return QtGui.QApplication.translate(context, text, disambig)
+        return QtWidgets.QApplication.translate(context, text, disambig)
 
 
-class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
+def readAnimatLabDir():
+    filename = "animatlabSimDir.txt"
+    try:
+        fic = open(filename, 'r')
+        directory = fic.readline()
+        fic.close()
+    except:
+        directory = ""
+    # print "First instance: Root directory will be created from GUI"
+    return directory
+
+
+class GetList(QDialog):
+    """
+    GetList creates a window with a list of QPushButtons and associatd QLabels
+    The QPushButtons are defined by listChoix and the list of QLabels by items.
+    A QGridLayout is used to dispose QPushButtons and QLabels.
+    In the QLabel, a default element of the items list is displayed
+    A dictionary is used to set the association of listChoix elements with an
+    element of the items list selected by the user
+    In call to the class procedure is made by the included function
+    listTransmit. A dictionary (dicItems) is sent with the actual listChoix.
+    WHen the user clicks on one of the QPushButton the list of items is
+    presented and the user select one item.
+    If the default item is OK, then closing the window confirms the default
+    items for each QPushButton (presneting listChoix elements)
+    A newdicItems is then returned.
+    """
+    MESSAGE = "<p>Message boxes have a caption, a text, and up to three " \
+        "buttons, each with standard or custom texts.</p>" \
+        "<p>Click a button to close the message box. Pressing the Esc " \
+        "button will activate the detected escape button (if any).</p>"
+
+    def __init__(self, parent=None, listChoix=('choix1', 'choix2'),
+                 items=("Spring", "Summer", "Fall", "Winter"),
+                 dicItems={'choix1': "Spring", 'choix2': "Fall"},
+                 titleText="Choose a season"):
+        super(GetList, self).__init__(parent)
+
+        layout = QGridLayout()
+        layout.setColumnStretch(1, 1)
+        layout.setColumnMinimumWidth(1, 250)
+
+        # self.parent=parent
+        self.items = items
+        self.dialogText = []
+        self.itemLabel = []
+        self.itemButton = []
+        self.itemList = []
+        self.listChoix = listChoix
+        self.dicItems = dicItems
+        self.newdicItems = {}
+        if len(dicItems) < len(listChoix):
+            print "GetList listChoix: {}    dicItems: {}".format(listChoix,
+                                                                 dicItems)
+            for i in (len(dicItems)+1, len(listChoix)):  # complete the dic
+                self.dicItems[listChoix[i]] = i
+        for itm in range(len(listChoix)):
+            self.dialogText.append(str(listChoix[itm]))
+        for itm in range(len(listChoix)):
+            self.errorMessageDialog = QErrorMessage(self)
+            frameStyle = QFrame.Sunken | QFrame.Panel
+            choix = listChoix[itm]
+            self.itemLabel.append(QLabel(self.dicItems[choix]))
+            self.itemLabel[itm].setFrameStyle(frameStyle)
+            self.itemButton.append(QPushButton(self.dialogText[itm]))
+
+            self.itemButton[itm].clicked.connect(partial(self.setItem, itm))
+            layout.addWidget(self.itemButton[itm], 1+itm, 0)
+            layout.addWidget(self.itemLabel[itm], 1+itm, 1)
+        self.setLayout(layout)
+        self.setWindowTitle(titleText)
+
+    def setItem(self, rg):
+        """
+        Function called by the "clicked.connect" event when a QPushButton is
+        clicked. This function calls a QInputDIalog procedure to present the
+        list of items and select one. It actualizes the newdicItems dictionary
+        (self.newdicItems) the the key corresponding to the QPushButton that
+        was activated (presenting an element of listChoix). The row of the
+        activatd QPushButton is givent in the variable rg.
+        """
+        print "rg: ", rg
+        diaText = self.dialogText[rg]
+        item, ok = QInputDialog.getItem(self,
+                                        diaText,
+                                        diaText,
+                                        self.items,
+                                        0,
+                                        False)
+        if ok and item:
+            self.itemLabel[rg].setText(item)
+            self.itemList.append(item)
+        print self.itemList
+        self.newdicItems = self.dicItems
+        self.newdicItems[str(self.listChoix[rg])] = item
+        print "   newdicItems:", self.newdicItems
+
+    def listtransmit_info(self):
+        """
+        Function used to transmit the self.newdicItems to "listTransmit"
+        """
+        # return self.itemList
+        return self.newdicItems
+
+    @staticmethod
+    def listTransmit(parent=None,
+                     listChoix=('choix1', 'choix2'),
+                     items=("Spring", "Summer", "Fall", "Winter"),
+                     dicItems={'choix1': "Spring", 'choix2': "Fall"},
+                     titleText="Choose a season:"):
+        """
+        Entry of the GetList class application. It works as a staticmethod
+        and returns newdicItems
+        """
+
+        dialog = GetList(parent,
+                         listChoix,
+                         items,
+                         dicItems,
+                         titleText)
+        dialog.exec_()  # si on veut bloquant
+        # item_list = dialog.listtransmit_info()
+        newdicItems = dialog.listtransmit_info()
+
+        if newdicItems == {}:     # if we did not click any item...
+            newdicItems = dicItems
+            print "no click.... keep default"
+            # print 'classe enfant unchanged: {}'.format(newdicItems)
+        if len(newdicItems) < len(listChoix):       # we removed one key...
+            for mnName in listChoix:
+                if mnName not in listChoix:
+                    del newdicItems[mnName]
+            print 'classe enfant changed -: {}'.format(newdicItems)
+
+        else:                                       # a new key was added
+            print 'classe enfant changed +: {}'.format(newdicItems)
+        # return item_list
+        return newdicItems
+
+
+class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
+    """
+    doc string
+    """
     def __init__(self):
         # Explaining super is out of the scope of this article
         # So please google it if you're not familar with it
@@ -112,27 +295,39 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         self.label_3.setText(_translate("MainWindow", lab3, None))
         lab4 = "Sensory                         MN      Mvt"
         self.label_4.setText(_translate("MainWindow", lab4, None))
+        # self.list_item = []
+        self.newMNtoSt = {}
+        self.MNtoSt = {}
+        self.folders = FolderOrg()
+        self.sims = None
+        self.model = None
+        self.projMan = None
+        self.optSet = None
 
-    def loadParams(self, paramFicName, optSet, listparNameOpt):
+    def loadParams(self, paramFicName, listparNameOpt):
+        """
+        doc string
+        """
         try:
             print "looking paramOpt file:", paramFicName
             with open(paramFicName, 'rb') as input:
-                optSet.paramLoebName = pickle.load(input)
-                optSet.paramLoebValue = pickle.load(input)
-                optSet.paramLoebType = pickle.load(input)
-                optSet.paramLoebCoul = pickle.load(input)
-                optSet.paramMarquezName = pickle.load(input)
-                optSet.paramMarquezValue = pickle.load(input)
-                optSet.paramMarquezType = pickle.load(input)
-                optSet.paramMarquezCoul = pickle.load(input)
-            print "nb loded param :", len(optSet.paramLoebName)
+                self.optSet.paramLoebName = pickle.load(input)
+                self.optSet.paramLoebValue = pickle.load(input)
+                self.optSet.paramLoebType = pickle.load(input)
+                self.optSet.paramLoebCoul = pickle.load(input)
+                self.optSet.paramMarquezName = pickle.load(input)
+                self.optSet.paramMarquezValue = pickle.load(input)
+                self.optSet.paramMarquezType = pickle.load(input)
+                self.optSet.paramMarquezCoul = pickle.load(input)
+            print "nb loded param :", len(self.optSet.paramLoebName)
             print "nb actual param:", len(listparNameOpt)
-            if len(optSet.paramLoebName) == len(listparNameOpt):
+            if len(self.optSet.paramLoebName) == len(listparNameOpt):
                 print "paramOpt :"
-                optSet.printParams(optSet.paramLoebName, optSet.paramLoebValue)
+                self.optSet.printParams(self.optSet.paramLoebName,
+                                        self.optSet.paramLoebValue)
                 print "paramMarquez :"
-                optSet.printParams(optSet.paramMarquezName,
-                                   optSet.paramMarquezValue)
+                self.optSet.printParams(self.optSet.paramMarquezName,
+                                        self.optSet.paramMarquezValue)
                 print '====  Param loaded  ===='
                 response = True
             else:
@@ -145,26 +340,44 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         return response
 
     def closeIt(self):
+        """
+        doc string
+        """
         self.close()
 
     def saveparamFile(self):
-        saveParams(folders.animatlab_result_dir + 'paramOpt.pkl', optSet)
+        """
+        doc string
+        """
+        self.miseAjour()
+        saveParams(self.folders.animatlab_result_dir + 'paramOpt.pkl',
+                   self.optSet)
 
     def miseAjour(self):
+        """
+        doc string
+        """
         # lecture de la colonne "Parametres Loeb"
         self.parLoebVal = self.getValuesFromPannel(self.tableWidget_7,
-                                                   optSet.paramLoebName,
-                                                   optSet.paramLoebType,
+                                                   self.optSet.paramLoebName,
+                                                   self.optSet.paramLoebType,
                                                    "Loeb Param")
-        optSet.paramLoebValue = self.parLoebVal
+        self.optSet.paramLoebValue = self.parLoebVal
+        self.optSet.actualizeparamLoeb()
+
         # lecture de la colonne "Parametres Marquez"
-        self.parMarqVal = self.getValuesFromPannel(self.tableWidget_8,
-                                                   optSet.paramMarquezName,
-                                                   optSet.paramMarquezType,
-                                                   "Marquez Param")
-        optSet.paramMarquezValue = self.parMarqVal
+        self.parMarqVal = self.\
+            getValuesFromPannel(self.tableWidget_8,
+                                self.optSet.paramMarquezName,
+                                self.optSet.paramMarquezType,
+                                "Marquez Param")
+        self.optSet.paramMarquezValue = self.parMarqVal
+        self.optSet.actualizeparamMarquez()
 
     def getValuesFromPannel(self, tableWidg, paramTabName, paramTabType, txt):
+        """
+        doc string
+        """
         # print self.paramType
         listparValStr = []
         for rg in range(len(paramTabName)):
@@ -174,129 +387,225 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         # print listparValStr
         print "@@ ", txt, " actualized  @@"
         paramValue = applyType(paramTabType, listparValStr)
-        optSet.printParams(paramTabName, paramValue)
+        self.optSet.printParams(paramTabName, paramValue)
         return paramValue
 
     def stim_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget, optSet.stimName,
+        rep = self.cell_was_clicked(self.tableWidget, self.optSet.stimName,
                                     row, column, oneChk, col=2)
         firstListNb = rep[0]
         secondListNb = rep[1]
-        optSet.paramOpt['dontChangeStimNbs'] = firstListNb
-        optSet.paramOpt['disabledStimNbs'] = secondListNb
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['dontChangeStimNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['disabledStimNbs']))
+        self.optSet.paramOpt['dontChangeStimNbs'] = firstListNb
+        self.optSet.paramOpt['disabledStimNbs'] = secondListNb
+        # print type(self.optSet.actualizeparamLoeb())
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['dontChangeStimNbs']))
+        itm2 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['disabledStimNbs']))
         self.tableWidget_7.setItem(13, 1, itm1)
         self.tableWidget_7.setItem(12, 1, itm2)
 
     def connex_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget_2, optSet.connexName,
+        rep = self.cell_was_clicked(self.tableWidget_2, self.optSet.connexName,
                                     row, column, oneChk, col=2)
         firstListNb = rep[0]
         secondListNb = rep[1]
-        optSet.paramOpt['dontChangeStimNbs'] = firstListNb
-        optSet.paramOpt['disabledStimNbs'] = secondListNb
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['dontChangeSynNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['disabledSynNbs']))
+        self.optSet.paramOpt['dontChangeSynNbs'] = firstListNb
+        self.optSet.paramOpt['disabledSynNbs'] = secondListNb
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynNbs']))
+        itm2 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['disabledSynNbs']))
         self.tableWidget_7.setItem(17, 1, itm1)
         self.tableWidget_7.setItem(16, 1, itm2)
 
     def connexFR_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget_3, optSet.connexFRName,
+        rep = self.cell_was_clicked(self.tableWidget_3,
+                                    self.optSet.connexFRName,
                                     row, column, oneChk, col=2)
         firstListNb = rep[0]
         secondListNb = rep[1]
-        optSet.paramOpt['dontChangeSynFRNbs'] = firstListNb
-        optSet.paramOpt['disabledSynFRNbs'] = secondListNb
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['dontChangeSynFRNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['disabledSynFRNbs']))
+        self.optSet.paramOpt['dontChangeSynFRNbs'] = firstListNb
+        self.optSet.paramOpt['disabledSynFRNbs'] = secondListNb
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynFRNbs']))
+        itm2 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['disabledSynFRNbs']))
         self.tableWidget_7.setItem(19, 1, itm1)
         self.tableWidget_7.setItem(18, 1, itm2)
 
     def neuron_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget_4, optSet.neuronNames,
+        rep = self.cell_was_clicked(self.tableWidget_4,
+                                    self.optSet.neuronNames,
                                     row, column, oneChk, col=2)
         firstListNb = rep[0]
         secondListNb = rep[1]
-        optSet.paramMarquez['sensoryNeuronNbs'] = firstListNb
-        optSet.paramMarquez['motorNeuronNbs'] = secondListNb
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['sensoryNeuronNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['motorNeuronNbs']))
+        self.optSet.paramMarquez['sensoryNeuronNbs'] = firstListNb
+        self.optSet.paramMarquez['motorNeuronNbs'] = secondListNb
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramMarquez['sensoryNeuronNbs']))
+        itm2 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramMarquez['motorNeuronNbs']))
         self.tableWidget_8.setItem(5, 1, itm1)
         self.tableWidget_8.setItem(6, 1, itm2)
 
     def neuronFR_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget_5, optSet.neuronFRNames,
+        rep = self.cell_was_clicked(self.tableWidget_5,
+                                    self.optSet.neuronFRNames,
                                     row, column, oneChk, col=2)
         firstListNb = rep[0]
         secondListNb = rep[1]
-        optSet.paramMarquez['sensoryNeuronFRNbs'] = firstListNb
-        optSet.paramMarquez['motorNeuronFRNbs'] = secondListNb
-        optSet.actualizeparamMarquez
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['sensoryNeuronFRNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['motorNeuronFRNbs']))
+        self.optSet.paramMarquez['sensoryNeuronFRNbs'] = firstListNb
+        self.optSet.paramMarquez['motorNeuronFRNbs'] = secondListNb
+        # self.optSet.actualizeparamMarquez
+        itm1 = QtWidgets.QTableWidgetItem(str(firstListNb))
+        itm2 = QtWidgets.QTableWidgetItem(str(secondListNb))
         self.tableWidget_8.setItem(7, 1, itm1)
         self.tableWidget_8.setItem(8, 1, itm2)
 
     def chart_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 1
-        rep = self.cell_was_clicked(self.tableWidget_6, optSet.chartColNames,
+        rep = self.cell_was_clicked(self.tableWidget_6,
+                                    self.optSet.chartColNames,
                                     row, column, oneChk, col=3)
         firstListNb = rep[0]
+        # print "rep[0]", rep[0]
         secondListNb = rep[1]
+        # print "rep[1]", rep[1]
         thirdListNb = rep[2]
+        # print "rep[2]", thirdListNb
         for i in thirdListNb:
             thirdNb = i
 
-        optSet.paramMarquez['sensColChartNbs'] = firstListNb
-        optSet.paramMarquez['mnColChartNbs'] = secondListNb
-        optSet.paramOpt['mvtcolumn'] = thirdNb
-        optSet.actualizeparamMarquez
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['sensColChartNbs']))
-        itm2 = QtGui.\
-            QTableWidgetItem(str(optSet.paramMarquez['mnColChartNbs']))
-        itm3 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['mvtcolumn']))
+        self.optSet.paramMarquez['sensColChartNbs'] = firstListNb
+        self.optSet.paramMarquez['mnColChartNbs'] = secondListNb
+        self.optSet.paramOpt['mvtcolumn'] = thirdNb
+        # self.optSet.actualizeparamMarquez
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramMarquez['sensColChartNbs']))
+        itm2 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramMarquez['mnColChartNbs']))
+        itm3 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['mvtcolumn']))
         self.tableWidget_8.setItem(9, 1, itm1)
         self.tableWidget_8.setItem(10, 1, itm2)
         self.tableWidget_7.setItem(0, 1, itm3)
 
+        if column == 1:     # We have checked/unchecked a MN
+            self.optSet.mnColChartNbs = self.optSet.\
+                paramMarquez['mnColChartNbs']
+            self.optSet.mnColChartNames = []
+            for i in self.optSet.mnColChartNbs:
+                self.optSet.mnColChartNames.\
+                    append(self.optSet.chartColNames[i])
+            print
+            print self.optSet.mnColChartNames
+            # Creation of the dictionnary mnColChartNames->twitStMusclesStNames
+            if self.MNtoSt == {}:  # this is the first acces to the Dict...
+                i = 0
+                for mn in self.optSet.mnColChartNames:
+                    if self.optSet.twitStMusclesStNames == []:
+                        self.MNtoSt[mn] = self.optSet.stimName[i]
+                    else:
+                        self.MNtoSt[mn] = self.optSet.twitStMusclesStNames[i]
+                    i += 1
+
+            # Actualization of the dictionary ChartMN -> StimMNNb
+            twitMusNb = len(self.optSet.twitStMusclesStNames)
+            charmnNb = len(self.optSet.mnColChartNames)
+            print "charmnNb : {}    twitMusNb: {}".format(charmnNb, twitMusNb)
+
+            if twitMusNb > charmnNb:
+                print list(self.MNtoSt.keys())
+                for mnName in list(self.MNtoSt.keys()):
+                    if mnName not in self.optSet.mnColChartNames:
+                        del self.MNtoSt[mnName]
+            elif twitMusNb < charmnNb:
+                i = 0
+                for mnName in self.optSet.mnColChartNames:
+                    if mnName not in list(self.MNtoSt.keys()):
+                        self.MNtoSt[mnName] = self.optSet.stimName[i]
+                        i += 1
+            print "self.MNtoSt: ", self.MNtoSt
+
+            self.newMNtoSt = \
+                GetList.listTransmit(parent=None,
+                                     listChoix=self.optSet.mnColChartNames,
+                                     items=(self.optSet.stimName),
+                                     dicItems=self.MNtoSt,
+                                     titleText="Choose Stim of this MN:")
+            # print "self.newMNtoSt: ", self.newMNtoSt
+            # self.list_item = list(self.newMNtoSt.values())
+            print 'fen princ : {}'.format(self.newMNtoSt)
+            self.MNtoSt = self.newMNtoSt
+
+# TODO : continuer l'implementation
+            print list(self.MNtoSt.keys())
+            print list(self.MNtoSt.values())
+            twitchSt_listnb = []
+            self.optSet.twitStMusclesStNbs = []
+            self.optSet.twitStMusclesStNames = []
+            for mnNb in self.optSet.paramMarquez['mnColChartNbs']:
+                mnName = self.optSet.chartColNames[mnNb]
+                stName = self.MNtoSt[mnName]
+                stNb = self.optSet.rank_stim[stName]
+                twitchSt_listnb.append(stNb)
+                self.optSet.twitStMusclesStNames.append(stName)
+                self.optSet.twitStMusclesStNbs.append(stNb)
+            self.optSet.paramMarquez['twitStMusclesStNbs'] = twitchSt_listnb
+            itm4 = QtWidgets.QTableWidgetItem(str(twitchSt_listnb))
+            self.tableWidget_8.setItem(4, 1, itm4)
+
     def stimPar_cell_was_clicked(self, row, column):
+        """
+        doc string
+        """
         oneChk = 0
-        rep = self.cell_was_clicked(self.tableWidget_9, optSet.stimParam,
+        rep = self.cell_was_clicked(self.tableWidget_9,
+                                    self.optSet.stimParam,
                                     row, column, oneChk, col=1)
         firstListNb = rep[0]
         listParamStim = []
         for i in firstListNb:
-            listParamStim.append(optSet.stimParam[i])
-        optSet.paramOpt['seriesStimParam'] = listParamStim
-        optSet.actualizeparamLoeb
-        itm1 = QtGui.\
-            QTableWidgetItem(str(optSet.paramOpt['seriesStimParam']))
+            listParamStim.append(self.optSet.stimParam[i])
+        self.optSet.paramOpt['seriesStimParam'] = listParamStim
+        # self.optSet.actualizeparamLoeb
+        itm1 = QtWidgets.\
+            QTableWidgetItem(str(self.optSet.paramOpt['seriesStimParam']))
         self.tableWidget_7.setItem(14, 1, itm1)
 
     def cell_was_clicked(self, tableWidgt, listName, row, column, oneChk, col):
+        """
+        doc string
+        """
         firstChkList = []
         secondChkList = []
         thirdChkList = []
@@ -405,13 +714,25 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         return [firstListNb, secondListNb, thirdListNb]
 
     def browse_folder(self):
-        global folders, sims, model, projman, optSet
+        """
+        doc string
+        """
+        # global folders, sims, model, projman
         # self.listWidget.clear()     # If there are any elements in the list
-        mydir = "//Mac/Home/Documents/Labo/Scripts/AnimatLabV2/Human/test/"
-        dirname = QtGui.QFileDialog.getExistingDirectory(self,
-                                                         "Pick a folder",
-                                                         mydir
-                                                         )
+
+        animatsimdir = readAnimatLabDir()
+        if animatsimdir != "":
+            subdir = os.path.split(animatsimdir)[-1]
+            rootname = os.path.dirname(animatsimdir)
+            rootname += "/"
+        else:
+            print "First instance - no previous animatlab folder selected"
+            rootname = ""
+        # mydir = "//Mac/Home/Documents/Labo/Scripts/AnimatLabV2/Human/test/"
+        # mydir = ""
+        dirname = QtWidgets.QFileDialog.getExistingDirectory(self,
+                                                             "Pick a folder",
+                                                             rootname)
         # execute getExistingDirectory dialog and set the directory variable
         #  to be equal to the user selected directory
 
@@ -419,24 +740,30 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
             print "You chose %s" % dirname
             subdir = os.path.split(dirname)[-1]
             print subdir
-            folders = FolderOrg(subdir=subdir)
-            folders.affectDirectories()
+            rootname = os.path.dirname(dirname)
+            rootname += "/"
+            self.folders = FolderOrg(animatlab_rootFolder=rootname,
+                                     subdir=subdir)
+            self.folders.affectDirectories()
             saveAnimatLabDir(dirname)
 
             # ################################################################
             #                  Creation of sims & initialisation             #
             # ################################################################
             # Initializes the AnimatLabSimRunner
-            sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims",
-                    rootFolder=folders.animatlab_rootFolder,
-                    commonFiles=folders.animatlab_commonFiles_dir,
-                    sourceFiles=folders.python27_source_dir,
-                    simFiles=folders.animatlab_simFiles_dir,
-                    resultFiles=folders.animatlab_result_dir)
-            model = AnimatLabModel.AnimatLabModel(folders.animatlab_commonFiles_dir)
-            projMan = ProjectManager.ProjectManager('Test Project')
-            optSet = OptimizeSimSettings(folders=folders, model=model,
-                                         projMan=projMan, sims=sims)
+            self.sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims",
+                    rootFolder=self.folders.animatlab_rootFolder,
+                    commonFiles=self.folders.animatlab_commonFiles_dir,
+                    sourceFiles=self.folders.python27_source_dir,
+                    simFiles=self.folders.animatlab_simFiles_dir,
+                    resultFiles=self.folders.animatlab_result_dir)
+            self.model = AnimatLabModel.\
+                AnimatLabModel(self.folders.animatlab_commonFiles_dir)
+            self.projMan = ProjectManager.ProjectManager('Test Project')
+            self.optSet = OptimizeSimSettings(folders=self.folders,
+                                              model=self.model,
+                                              projMan=self.projMan,
+                                              sims=self.sims)
 
             # ################################################################
             #                      Default parameters                        #
@@ -531,144 +858,145 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
             #       Looks for a parameter file in the chosen directory      #
             # ###############################################################
             fileName = 'paramOpt.pkl'
-            if self.loadParams(folders.animatlab_result_dir+fileName,
-                               optSet, listparNameOpt):
-                listparNameOpt = optSet.paramLoebName
-                listparValOpt = optSet.paramLoebValue
-                listparTypeOpt = optSet.paramLoebType
-                listparCoulOpt = optSet.paramLoebCoul
-                optSet.actualizeparamLoeb()
-                listparNameMarquez = optSet.paramMarquezName
-                listparValMarquez = optSet.paramMarquezValue
-                listparTypeMarquez = optSet.paramMarquezType
-                listparCoulMarquez = optSet.paramMarquezCoul
-                optSet.actualizeparamMarquez()
+            if self.loadParams(self.folders.animatlab_result_dir+fileName,
+                               listparNameOpt):
+                listparNameOpt = self.optSet.paramLoebName
+                listparValOpt = self.optSet.paramLoebValue
+                listparTypeOpt = self.optSet.paramLoebType
+                listparCoulOpt = self.optSet.paramLoebCoul
+                self.optSet.actualizeparamLoeb()
+                listparNameMarquez = self.optSet.paramMarquezName
+                listparValMarquez = self.optSet.paramMarquezValue
+                listparTypeMarquez = self.optSet.paramMarquezType
+                listparCoulMarquez = self.optSet.paramMarquezCoul
+                self.optSet.actualizeparamMarquez()
             else:
-                optSet.paramLoebName = listparNameOpt
-                optSet.paramLoebValue = listparValOpt
-                optSet.paramLoebType = listparTypeOpt
-                optSet.paramLoebCoul = listparCoulOpt
-                optSet.actualizeparamLoeb()
-                optSet.paramMarquezName = listparNameMarquez
-                optSet.paramMarquezValue = listparValMarquez
-                optSet.paramMarquezType = listparTypeMarquez
-                optSet.paramMarquezCoul = listparCoulMarquez
-                optSet.actualizeparamMarquez()
+                self.optSet.paramLoebName = listparNameOpt
+                self.optSet.paramLoebValue = listparValOpt
+                self.optSet.paramLoebType = listparTypeOpt
+                self.optSet.paramLoebCoul = listparCoulOpt
+                self.optSet.actualizeparamLoeb()
+                self.optSet.paramMarquezName = listparNameMarquez
+                self.optSet.paramMarquezValue = listparValMarquez
+                self.optSet.paramMarquezType = listparTypeMarquez
+                self.optSet.paramMarquezCoul = listparCoulMarquez
+                self.optSet.actualizeparamMarquez()
             # If no parameter file found, then uses the default parameters
             self.exConn = []
-            for i in range(optSet.nbConnexions):
-                if optSet.tab_connexions[i][6] == "Disabled" or \
-                   optSet.tab_connexions[i][7] == "Disabled":
+            for i in range(self.optSet.nbConnexions):
+                if self.optSet.tab_connexions[i][6] == "Disabled" or \
+                   self.optSet.tab_connexions[i][7] == "Disabled":
                     self.exConn.append(i)
-                    # print optSet.tab_connexions[i][6]
-                    # print optSet.tab_connexions[i][7]
+                    # print self.optSet.tab_connexions[i][6]
+                    # print self.optSet.tab_connexions[i][7]
             for i in self.exConn:
-                if i not in optSet.paramOpt['disabledSynNbs']:
-                    optSet.paramOpt['disabledSynNbs'].append(i)
-            # optSet.paramOpt['disabledSynNbs'] += self.exConn
-            optSet.paramOpt['disabledSynNbs'] = \
-                list(set(optSet.paramOpt['disabledSynNbs']))
-            optSet.disabledSynNames = []
-            for i in optSet.disabledSynNbs:
-                optSet.disabledSynNames.append(optSet.connexName[i])
+                if i not in self.optSet.paramOpt['disabledSynNbs']:
+                    self.optSet.paramOpt['disabledSynNbs'].append(i)
+            # self.optSet.paramOpt['disabledSynNbs'] += self.exConn
+            self.optSet.paramOpt['disabledSynNbs'] = \
+                list(set(self.optSet.paramOpt['disabledSynNbs']))
+            self.optSet.disabledSynNames = []
+            for i in self.optSet.disabledSynNbs:
+                self.optSet.disabledSynNames.append(self.optSet.connexName[i])
 
             self.exConnFR = []
-            for i in range(optSet.nbSynapsesFR):
-                if optSet.tab_connexionsFR[i][3] == "Disabled" or \
-                   optSet.tab_connexionsFR[i][4] == "Disabled":
+            for i in range(self.optSet.nbSynapsesFR):
+                if self.optSet.tab_connexionsFR[i][3] == "Disabled" or \
+                   self.optSet.tab_connexionsFR[i][4] == "Disabled":
                     self.exConnFR.append(i)
             for i in self.exConnFR:
-                if i not in optSet.paramOpt['disabledSynFRNbs']:
-                    optSet.paramOpt['disabledSynFRNbs'].append(i)
-            # optSet.paramOpt['disabledSynFRNbs'] += self.exConnFR
-            optSet.paramOpt['disabledSynFRNbs'] = \
-                list(set(optSet.paramOpt['disabledSynFRNbs']))
-            optSet.disabledSynFRNames = []
-            for i in optSet.disabledSynFRNbs:
-                optSet.disabledSynFRNames.append(optSet.connexFRName[i])
+                if i not in self.optSet.paramOpt['disabledSynFRNbs']:
+                    self.optSet.paramOpt['disabledSynFRNbs'].append(i)
+            # self.optSet.paramOpt['disabledSynFRNbs'] += self.exConnFR
+            self.optSet.paramOpt['disabledSynFRNbs'] = \
+                list(set(self.optSet.paramOpt['disabledSynFRNbs']))
+            self.optSet.disabledSynFRNames = []
+            for i in self.optSet.disabledSynFRNbs:
+                self.optSet.disabledSynFRNames.\
+                    append(self.optSet.connexFRName[i])
 
             self.exStim = []
-            for i in range(optSet.nbStims):
-                name = optSet.model.getElementByID(optSet.tab_stims[i][6]).\
+            for i in range(self.optSet.nbStims):
+                name = self.optSet.model.\
+                    getElementByID(self.optSet.tab_stims[i][6]).\
                     find('Name').text
                 # print name
                 if name == "Disabled":
                     self.exStim.append(i)
             for i in self.exStim:
-                if i not in optSet.paramOpt['disabledStimNbs']:
-                    optSet.paramOpt['disabledStimNbs'].append(i)
-            # optSet.paramOpt['disabledStimNbs'] += self.exStim
-            optSet.paramOpt['disabledStimNbs'] = \
-                list(set(optSet.paramOpt['disabledStimNbs']))
-            optSet.disabledStimNames = []
-            for i in optSet.disabledStimNbs:
-                optSet.disabledStimNames.append(optSet.stimName[i])
+                if i not in self.optSet.paramOpt['disabledStimNbs']:
+                    self.optSet.paramOpt['disabledStimNbs'].append(i)
+            # self.optSet.paramOpt['disabledStimNbs'] += self.exStim
+            self.optSet.paramOpt['disabledStimNbs'] = \
+                list(set(self.optSet.paramOpt['disabledStimNbs']))
+            self.optSet.disabledStimNames = []
+            for i in self.optSet.disabledStimNbs:
+                self.optSet.disabledStimNames.append(self.optSet.stimName[i])
 
             for i in range(len(self.exStim)):
-                self.exStimName.append(optSet.stimName[self.exStim[i]])
+                self.exStimName.append(self.optSet.stimName[self.exStim[i]])
             for i in range(len(self.exConn)):
-                self.exConnName.append(optSet.connexName[self.exConn[i]])
+                self.exConnName.append(self.optSet.connexName[self.exConn[i]])
             for i in range(len(self.exConnFR)):
-                self.exConnFRName.append(optSet.connexFRName[self.exConnFR[i]])
+                self.exConnFRName.\
+                    append(self.optSet.connexFRName[self.exConnFR[i]])
 
         # ################################################################
         #                   Select list of External Stimuli              #
         # ################################################################
-        self.tableWidget.setRowCount(len(optSet.stimName))
+        self.tableWidget.setRowCount(len(self.optSet.stimName))
         self.tableWidget.setColumnCount(2)
         self.tableWidget.verticalHeader().hide()
         self.tableWidget.horizontalHeader().hide()
-        for i in range(len(optSet.stimName)):
-            itm1 = QtGui.QTableWidgetItem("{0} {1}".
-                                          format(i, optSet.stimName[i]))
+        for idx, elem in enumerate(self.optSet.stimName):
+            itm1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['dontChangeStimNbs']):
+            if idx in self.optSet.paramOpt['dontChangeStimNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
 
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['disabledStimNbs']):
+            if idx in self.optSet.paramOpt['disabledStimNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget.setItem(i, 0, itm1)
-            self.tableWidget.setItem(i, 1, itm2)
-            self.tableWidget.item(i, 0).\
-                setBackground(QtGui.QColor(optSet.paramLoebCoul[11]))
+            self.tableWidget.setItem(idx, 0, itm1)
+            self.tableWidget.setItem(idx, 1, itm2)
+            self.tableWidget.item(idx, 0).\
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[11]))
         self.tableWidget.resizeColumnsToContents()
         self.tableWidget.cellClicked.connect(self.stim_cell_was_clicked)
         # ################################################################
         #                Select list of Connexions                       #
         # ################################################################
-        self.tableWidget_2.setRowCount(len(optSet.connexName))
+        self.tableWidget_2.setRowCount(len(self.optSet.connexName))
         self.tableWidget_2.setColumnCount(2)
         self.tableWidget_2.verticalHeader().hide()
         self.tableWidget_2.horizontalHeader().hide()
-        for i in range(len(optSet.connexName)):
-            itm1 = QtGui.\
-                QTableWidgetItem("{0} {1}".
-                                 format(i, optSet.connexName[i]))
+        for idx, elem in enumerate(self.optSet.connexName):
+            itm1 = QtWidgets.\
+                QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['dontChangeSynNbs']):
+            if idx in self.optSet.paramOpt['dontChangeSynNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['disabledSynNbs']):
+            if idx in self.optSet.paramOpt['disabledSynNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_2.setItem(i, 0, itm1)
-            self.tableWidget_2.setItem(i, 1, itm2)
-            self.tableWidget_2.item(i, 0).\
-                setBackground(QtGui.QColor(optSet.paramLoebCoul[15]))
+            self.tableWidget_2.setItem(idx, 0, itm1)
+            self.tableWidget_2.setItem(idx, 1, itm2)
+            self.tableWidget_2.item(idx, 0).\
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[15]))
         self.tableWidget_2.resizeColumnsToContents()
         self.tableWidget_2.cellClicked.connect(self.connex_cell_was_clicked)
 
@@ -678,30 +1006,29 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         # ################################################################
         #                Select list of ConnexionsFR                      #
         # ################################################################
-        self.tableWidget_3.setRowCount(len(optSet.connexFRName))
+        self.tableWidget_3.setRowCount(len(self.optSet.connexFRName))
         self.tableWidget_3.setColumnCount(2)
         self.tableWidget_3.verticalHeader().hide()
         self.tableWidget_3.horizontalHeader().hide()
-        for i in range(len(optSet.connexFRName)):
-            itm1 = QtGui.QTableWidgetItem("{0} {1}".
-                                          format(i, optSet.connexFRName[i]))
+        for idx, elem in enumerate(self.optSet.connexFRName):
+            itm1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['dontChangeSynFRNbs']):
+            if idx in self.optSet.paramOpt['dontChangeSynFRNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramOpt['disabledSynFRNbs']):
+            if idx in self.optSet.paramOpt['disabledSynFRNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_3.setItem(i, 0, itm1)
-            self.tableWidget_3.setItem(i, 1, itm2)
-            self.tableWidget_3.item(i, 0).\
-                setBackground(QtGui.QColor(optSet.paramLoebCoul[15]))
+            self.tableWidget_3.setItem(idx, 0, itm1)
+            self.tableWidget_3.setItem(idx, 1, itm2)
+            self.tableWidget_3.item(idx, 0).\
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[15]))
         self.tableWidget_3.resizeColumnsToContents()
         self.tableWidget_3.cellClicked.connect(self.connexFR_cell_was_clicked)
 
@@ -711,172 +1038,169 @@ class ReadAsimAform(QtGui.QMainWindow, design3.Ui_MainWindow):
         # ################################################################
         #                    Select list of Neurons                      #
         # ################################################################
-        self.tableWidget_4.setRowCount(len(optSet.neuronNames))
+        self.tableWidget_4.setRowCount(len(self.optSet.neuronNames))
         self.tableWidget_4.setColumnCount(2)
         self.tableWidget_4.verticalHeader().hide()
         self.tableWidget_4.horizontalHeader().hide()
-        for i in range(len(optSet.neuronNames)):
-            itm1 = QtGui.QTableWidgetItem("{0} {1}".
-                                          format(i, optSet.neuronNames[i]))
+        for idx, elem in enumerate(self.optSet.neuronNames):
+            itm1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['sensoryNeuronNbs']):
+            if idx in self.optSet.paramMarquez['sensoryNeuronNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['motorNeuronNbs']):
+            if idx in self.optSet.paramMarquez['motorNeuronNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_4.setItem(i, 0, itm1)
-            self.tableWidget_4.setItem(i, 1, itm2)
-            self.tableWidget_4.item(i, 0).\
+            self.tableWidget_4.setItem(idx, 0, itm1)
+            self.tableWidget_4.setItem(idx, 1, itm2)
+            self.tableWidget_4.item(idx, 0).\
                 setBackground(QtGui.QColor('gold'))
         self.tableWidget_4.resizeColumnsToContents()
         self.tableWidget_4.cellClicked.connect(self.neuron_cell_was_clicked)
         # ################################################################
         #                  Select list of NeuronsFR                      #
         # ################################################################
-        self.tableWidget_5.setRowCount(len(optSet.neuronFRNames))
+        self.tableWidget_5.setRowCount(len(self.optSet.neuronFRNames))
         self.tableWidget_5.setColumnCount(2)
         self.tableWidget_5.verticalHeader().hide()
         self.tableWidget_5.horizontalHeader().hide()
-        for i in range(len(optSet.neuronFRNames)):
-            itm1 = QtGui.QTableWidgetItem("{0} {1}".
-                                          format(i, optSet.neuronFRNames[i]))
+        for idx, elem in enumerate(self.optSet.neuronFRNames):
+            itm1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['sensoryNeuronFRNbs']):
+            if idx in self.optSet.paramMarquez['sensoryNeuronFRNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['motorNeuronFRNbs']):
+            if idx in self.optSet.paramMarquez['motorNeuronFRNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_5.setItem(i, 0, itm1)
-            self.tableWidget_5.setItem(i, 1, itm2)
-            self.tableWidget_5.item(i, 0).\
+            self.tableWidget_5.setItem(idx, 0, itm1)
+            self.tableWidget_5.setItem(idx, 1, itm2)
+            self.tableWidget_5.item(idx, 0).\
                 setBackground(QtGui.QColor('gold'))
         self.tableWidget_5.resizeColumnsToContents()
         self.tableWidget_5.cellClicked.connect(self.neuronFR_cell_was_clicked)
         # ################################################################
         #                  Select list of Chart Names                    #
         # ################################################################
-        self.tableWidget_6.setRowCount(len(optSet.chartColNames))
+        self.tableWidget_6.setRowCount(len(self.optSet.chartColNames))
         self.tableWidget_6.setColumnCount(3)
         self.tableWidget_6.verticalHeader().hide()
         self.tableWidget_6.horizontalHeader().hide()
-        for i in range(len(optSet.chartColNames)):
-            itm1 = QtGui.QTableWidgetItem("{0} {1}".
-                                          format(i, optSet.chartColNames[i]))
+        for idx, elem in enumerate(self.optSet.chartColNames):
+            itm1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['sensColChartNbs']):
+            if idx in self.optSet.paramMarquez['sensColChartNbs']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
 
-            itm2 = QtGui.QTableWidgetItem("")
+            itm2 = QtWidgets.QTableWidgetItem("")
             itm2.setFlags(itm2.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i in (optSet.paramMarquez['mnColChartNbs']):
+            if idx in self.optSet.paramMarquez['mnColChartNbs']:
                 itm2.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('blue'))
             else:
                 itm2.setCheckState(QtCore.Qt.Unchecked)
 
-            itm3 = QtGui.QTableWidgetItem("")
+            itm3 = QtWidgets.QTableWidgetItem("")
             itm3.setFlags(itm3.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if i == optSet.paramOpt['mvtcolumn']:
+            if idx == self.optSet.paramOpt['mvtcolumn']:
                 itm3.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('magenta'))
             else:
                 itm3.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_6.setItem(i, 0, itm1)
-            self.tableWidget_6.setItem(i, 1, itm2)
-            self.tableWidget_6.setItem(i, 2, itm3)
-            self.tableWidget_6.item(i, 0).\
+            self.tableWidget_6.setItem(idx, 0, itm1)
+            self.tableWidget_6.setItem(idx, 1, itm2)
+            self.tableWidget_6.setItem(idx, 2, itm3)
+            self.tableWidget_6.item(idx, 0).\
                 setBackground(QtGui.QColor('LavenderBlush'))
         self.tableWidget_6.resizeColumnsToContents()
         self.tableWidget_6.cellClicked.connect(self.chart_cell_was_clicked)
         # ################################################################
         #              Parameters for Loeb Optimization                  #
         # ################################################################
-        self.tableWidget_7.setRowCount(len(optSet.paramLoebName))
+        self.tableWidget_7.setRowCount(len(self.optSet.paramLoebName))
         self.tableWidget_7.setColumnCount(2)
         self.tableWidget_7.verticalHeader().hide()
         self.tableWidget_7.horizontalHeader().hide()
-        for i in range(len(optSet.paramLoebName)):
-            item1 = QtGui.QTableWidgetItem("{0} {1}".
-                                           format(i, optSet.paramLoebName[i]))
+        for idx, elem in enumerate(self.optSet.paramLoebName):
+            item1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
             item1.setTextAlignment(QtCore.Qt.AlignLeft)
-            item2 = QtGui.QTableWidgetItem("{0}".
-                                           format(optSet.paramLoebValue[i]))
+            txt = self.optSet.paramLoebValue[idx]
+            item2 = QtWidgets.QTableWidgetItem("{0}".format(txt))
             item2.setSizeHint(QSize(500, 0))
-            self.tableWidget_7.setItem(i, 0, item1)
-            self.tableWidget_7.setItem(i, 1, item2)
-            self.tableWidget_7.item(i, 0).\
-                setBackground(QtGui.QColor(optSet.paramLoebCoul[i]))
+            self.tableWidget_7.setItem(idx, 0, item1)
+            self.tableWidget_7.setItem(idx, 1, item2)
+            self.tableWidget_7.item(idx, 0).\
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[idx]))
         self.tableWidget_7.resizeColumnsToContents()
         # ################################################################
         #              Parameters for Marquez Optimization               #
         # ################################################################
-        self.tableWidget_8.setRowCount(len(optSet.paramMarquezName))
+        self.tableWidget_8.setRowCount(len(self.optSet.paramMarquezName))
         self.tableWidget_8.setColumnCount(2)
         self.tableWidget_8.verticalHeader().hide()
         self.tableWidget_8.horizontalHeader().hide()
-        for i in range(len(optSet.paramMarquezName)):
-            item1 = QtGui.QTableWidgetItem("{0} {1}".
-                                           format(i,
-                                                  optSet.paramMarquezName[i]))
-            item2 = QtGui.QTableWidgetItem("{0}".
-                                           format(optSet.paramMarquezValue[i]))
+        for idx, elem in enumerate(self.optSet.paramMarquezName):
+            item1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
+            txt = self.optSet.paramMarquezValue[idx]
+            item2 = QtWidgets.QTableWidgetItem("{0}".format(txt))
             item2.setSizeHint(QSize(500, 0))
-            self.tableWidget_8.setItem(i, 0, item1)
-            self.tableWidget_8.setItem(i, 1, item2)
-            self.tableWidget_8.item(i, 0).\
-                setBackground(QtGui.QColor(optSet.paramMarquezCoul[i]))
+            self.tableWidget_8.setItem(idx, 0, item1)
+            self.tableWidget_8.setItem(idx, 1, item2)
+            self.tableWidget_8.item(idx, 0).\
+                setBackground(QtGui.QColor(self.optSet.paramMarquezCoul[idx]))
         self.tableWidget_8.resizeColumnsToContents()
 
         # ################################################################
         #                  Select External Stimuli parameters            #
         # ################################################################
-        self.tableWidget_9.setRowCount(len(optSet.stimParam))
+        self.tableWidget_9.setRowCount(len(self.optSet.stimParam))
         self.tableWidget_9.setColumnCount(1)
         self.tableWidget_9.verticalHeader().hide()
         self.tableWidget_9.horizontalHeader().hide()
-        for i in range(len(optSet.stimParam)):
-            itm1 = QtGui.QTableWidgetItem(str(optSet.stimParam[i]))
+        for idx, elem in enumerate(self.optSet.stimParam):
+            itm1 = QtWidgets.QTableWidgetItem(str(elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if optSet.stimParam[i] in (optSet.paramOpt['seriesStimParam']):
+            if self.optSet.stimParam[idx] in self.optSet.paramOpt['seriesStimParam']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
                 itm1.setCheckState(QtCore.Qt.Unchecked)
-            self.tableWidget_9.setItem(i, 0, itm1)
-            self.tableWidget_9.item(i, 0).\
+            self.tableWidget_9.setItem(idx, 0, itm1)
+            self.tableWidget_9.item(idx, 0).\
                 setBackground(QtGui.QColor('lightCyan'))
         self.tableWidget_9.resizeColumnsToContents()
         self.tableWidget_9.cellClicked.connect(self.stimPar_cell_was_clicked)
 
 
 def applyType(paramType, strTab):
+    """
+    doc string
+    """
     tab = []
-    for k in range(len(strTab)):
-        # print strTab[k]
-        if paramType[k] is int:
-            tab.append(int(strTab[k]))
-        elif paramType[k] is float:
-            tab.append(float(strTab[k]))
-        elif paramType[k] is list:
-            if strTab[k][0] == "[":
-                chaine = strTab[k][1:-1]
+    for chain in range(len(strTab)):
+        # print strTab[chain]
+        if paramType[chain] is int:
+            tab.append(int(strTab[chain]))
+        elif paramType[chain] is float:
+            tab.append(float(strTab[chain]))
+        elif paramType[chain] is list:
+            if strTab[chain][0] == "[":
+                chaine = strTab[chain][1:-1]
                 # print chaine
                 if chaine == '':
                     tab.append([])
@@ -884,28 +1208,31 @@ def applyType(paramType, strTab):
                     listStr = chaine.split(",")
                     try:
                         listVal = []
-                        for n in range(len(listStr)):
-                            v = int(listStr[n])
-                            listVal.append(v)
+                        for rang in range(len(listStr)):
+                            val = int(listStr[rang])
+                            listVal.append(val)
                         tab.append(listVal)
                     except:
                         listVal = []
-                        for n in range(len(listStr)):
-                            # print listStr[n]
-                            if listStr[n][0] == " ":
-                                listStr[n] = listStr[n][1:]
-                                # print listStr[n]
-                            s = listStr[n]
-                            if s[0] == "'":
-                                s2 = s[1:-1]
-                                # print s2
+                        for rang in range(len(listStr)):
+                            # print listStr[rang]
+                            if listStr[rang][0] == " ":
+                                listStr[rang] = listStr[rang][1:]
+                                # print listStr[rang]
+                            par = listStr[rang]
+                            if par[0] == "'":
+                                par2 = par[1:-1]
+                                # print par2
                                 # print
-                                listVal.append(s2)
+                                listVal.append(par2)
                         tab.append(listVal)
     return tab
 
 
 def saveParams(paramFicName, optSet):
+    """
+    doc string
+    """
     with open(paramFicName, 'wb') as output:
         pickle.dump(optSet.paramLoebName, output)
         pickle.dump(optSet.paramLoebValue, output)
@@ -919,14 +1246,22 @@ def saveParams(paramFicName, optSet):
 
 
 def saveAnimatLabDir(directory):
+    """
+    doc string
+    """
     filename = "animatlabSimDir.txt"
-    f = open(filename, 'w')
-    f.write(directory)
-    f.close()
+    fic = open(filename, 'w')
+    fic.write(directory)
+    fic.close()
 
 
 def main():
-    app = QtGui.QApplication(sys.argv)  # A new instance of QApplicationPWD
+    """
+    doc string
+    """
+    # import qdarkstyle
+    app = QtWidgets.QApplication(sys.argv)  # A new instance of QApplicationPWD
+    # app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     form = ReadAsimAform()  # We set the form to be our ExampleApp (design)
     form.show()  # Show the form
     app.exec_()  # and execute the app
