@@ -12,14 +12,11 @@ class FolderOrg():
     """
     def __init__(self, animatlab_rootFolder="", animatlab_commonFiles_dir="",
                  animatlab_simFiles_dir="", animatlab_result_dir="",
-                 python27_source_dir="", subdir = "montest"):
+                 python27_source_dir="", subdir="montest"):
         """
 
         """
         self.animatlab_rootFolder = animatlab_rootFolder
-        if self.animatlab_rootFolder == '':
-            self.animatlab_rootFolder = "//Mac/Home/Documents/Labo/" +\
-                                        "Scripts/AnimatLabV2/Human/test/"
         self.animatlab_commonFiles_dir = animatlab_commonFiles_dir
         self.animatlab_simFiles_dir = animatlab_simFiles_dir
         self.animatlab_result_dir = animatlab_result_dir
@@ -27,6 +24,9 @@ class FolderOrg():
         self.python27_source_dir = python27_source_dir
 
     def affectDirectories(self):
+        """
+
+        """
         foldername = self.subdir
         self.animatlab_rootFolder += foldername + "/"
         self.animatlab_commonFiles_dir=self.animatlab_rootFolder+"FinalModel/"
