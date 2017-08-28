@@ -3,6 +3,8 @@
 Created on Fri Feb 12 09:38:33 2016
 Modified on Fri Oct 07 17:47:25 2016
 @author: Daniel cattaert
+modified August 24, 2017:
+    python27_source_dir is now given in the call to the class
 """
 
 
@@ -32,7 +34,8 @@ class FolderOrg():
         self.animatlab_commonFiles_dir=self.animatlab_rootFolder+"FinalModel/"
         self.animatlab_simFiles_dir = self.animatlab_rootFolder + "SimFiles/"
         self.animatlab_result_dir = self.animatlab_rootFolder + "ResultFiles/"
-        self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"
+        #if self.python27_source_dir == "":
+        #    self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"
         print self.animatlab_rootFolder
         print self.animatlab_commonFiles_dir
         print self.animatlab_simFiles_dir
