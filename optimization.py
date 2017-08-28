@@ -24,6 +24,26 @@ modified August 24, 2017 (D. Cattaert):
     in order to choose the parameters rather than take it from optSet class
 
     getlistparam was changed accordingly
+Modified August 28, 2017:
+   all asim Files created in the Marquez procedure are now saved in the floder
+   FinalTwitchModel
+   new procedures created:
+    def findList_asimFiles(directory):
+    list_asim = []
+    if not os.path.exists(directory):
+        print "No such directory exists !!!!!!"
+    else:
+        onlyfiles = [f for f in listdir(directory)
+                     if isfile(join(directory, f))]
+        # print onlyfiles
+        for f in onlyfiles:
+            if f.endswith(".asim"):
+                # print f
+                # simN = f[:f.find('.')]
+                # print simN
+                list_asim.append(f)
+    return list_asim
+  the mainOpt.py has been implemented accordingly
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -533,6 +553,23 @@ def get_filepaths(directory):
     return file_paths  # Self-explanatory.
 
 
+def findList_asimFiles(directory):
+    list_asim = []
+    if not os.path.exists(directory):
+        print "No such directory exists !!!!!!"
+    else:
+        onlyfiles = [f for f in listdir(directory)
+                     if isfile(join(directory, f))]
+        # print onlyfiles
+        for f in onlyfiles:
+            if f.endswith(".asim"):
+                # print f
+                # simN = f[:f.find('.')]
+                # print simN
+                list_asim.append(f)
+    return list_asim
+
+
 def findChartName(directory):
     onlyfiles = [f for f in listdir(directory)
                  if isfile(join(directory, f))]
@@ -542,6 +579,8 @@ def findChartName(directory):
             # print f
             chartN = f[:f.find('.')]
             # print chartN
+        else:
+            chartN = ""
     for f in onlyfiles:
         if f.endswith(".asim"):
             # print f
@@ -2267,6 +2306,15 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
             savechartfile("twitchchart", twitchdir, tableTmp[k], comment)
             k += 1
 
+        print "\nsaving twitch asim File to FinalTwitchModel Directory"
+        sourceDir = folders.animatlab_simFiles_dir
+        destDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+        if not os.path.exists(destDir):
+            os.makedirs(destDir)
+        simTwitchFileNames = findList_asimFiles(sourceDir)
+        for asimFileName in simTwitchFileNames:
+            copyFile(asimFileName, sourceDir, destDir+stimName[ii])
+
     for amp in range(len(twitchAmpSet)):
         print
         print 'twitchAmp: ', twitchAmpSet[amp]
@@ -2318,12 +2366,6 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
     affich_table(corr)
     writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, nbruns,
                           chartColNames, mnCol, sensCol)
-    print "\nsaving twitch asim File to FinalTwitchModel Directory"
-    sourceDir = folders.animatlab_commonFiles_dir
-    destDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
-    if not os.path.exists(destDir):
-        os.makedirs(destDir)
-    copyFile(simFileName, sourceDir, destDir)
 
     print "\ncopying original asim File back to FinalModel Directory"
     sourceDir = folders.animatlab_rootFolder + "temp/"
