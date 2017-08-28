@@ -20,7 +20,7 @@ modified July 17, 2017 (D.Cataert)
                             subdir=subdir)
     this is the same modification as made in GUI_AnimatLabOptimization.py
 
-modified August24, 2017
+modified August 24, 2017
     in actualiseSaveAprojFromAsim(asimFileName):
     [asimSimSet, asimtab_stims] = getSimSetFromAsim(optSet,
                                                     seriesStimParam,
@@ -29,6 +29,18 @@ modified August24, 2017
                                                     asimFileName)
     getSimSetFromAsim call was acutalized according to the new format
     adopted in optimization.py
+modified August 28, 2017:
+  new procedure to get the AnimatLab V2 program path
+    def readAnimatLabV2ProgDir():
+    filename = "animatlabV2ProgDir.txt"
+    try:
+        fic = open(filename, 'r')
+        directory = fic.readline()
+        fic.close()
+    except:
+        directory = ""
+    # print "First instance: Root directory will be created from GUI"
+    return directory
 @author: cattaert
 """
 import class_animatLabModel as AnimatLabModel
@@ -53,9 +65,22 @@ from optimization import improveSynapses, improveSynapsesFR, improveStims
 from optimization import writeTitres, tablo, findChartName, findTxtFileName
 from optimization import savechartfile, writeBestResSuite
 from optimization import writeaddTab, testquality, copyRenameFile
+from optimization import findList_asimFiles
 from optimization import getSimSetFromAsim
 # from optimization import getlistparam
 from cma import fmin
+
+
+def readAnimatLabV2ProgDir():
+    filename = "animatlabV2ProgDir.txt"
+    try:
+        fic = open(filename, 'r')
+        directory = fic.readline()
+        fic.close()
+    except:
+        directory = ""
+    # print "First instance: Root directory will be created from GUI"
+    return directory
 
 
 def readAnimatLabDir():
@@ -69,12 +94,14 @@ def readAnimatLabDir():
     return directory
 
 animatsimdir = readAnimatLabDir()
+animatLabV2ProgDir = readAnimatLabV2ProgDir()
 if animatsimdir != "":
     subdir = os.path.split(animatsimdir)[-1]
     print subdir
     rootname = os.path.dirname(animatsimdir)
     rootname += "/"
     folders = FolderOrg(animatlab_rootFolder=rootname,
+                        python27_source_dir=animatLabV2ProgDir,
                         subdir=subdir)
     folders.affectDirectories()
 else:
@@ -449,8 +476,13 @@ if __name__ == '__main__':
         #     "FinalModel/" + os.path.split(model.asimFile)[-1]
         # asimFileName = folders.animatlab_rootFolder +\
         #    "CMAeBestSimFiles/" + os.path.split(model.asimFile)[-1]
-        asimFileName = folders.animatlab_rootFolder +\
-            "FinalTwitchModel/" + os.path.split(model.asimFile)[-1]
+        # asimFileName = folders.animatlab_rootFolder +\
+        #    "FinalTwitchModel/" + os.path.split(model.asimFile)[-1]
+        sourceDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+        asimFileNamesList = findList_asimFiles(sourceDir)
+        if asimFileNamesList != []:
+            asimFileName = folders.animatlab_rootFolder +\
+                "FinalTwitchModel/" + asimFileNamesList[0]
         # Here, indicate the .asim file from which to extract parameters
         # ###################################################################
         # actualiseSaveAprojFromAsim(asimFileName)
