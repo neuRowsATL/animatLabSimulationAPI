@@ -25,7 +25,7 @@ Modified June 29,2017
     This GUI soft is now upgraded to work with PyQt5
 Modified July 17, 2017
     def browse_folder(self):(line 575): function modified to extract both
-    rootname and subdir from readAnimatLabDir() (a function that reads the
+    rootname and subdir from readAnimatLabSimDir() (a function that reads the
     path to the previous animatlab simulation visited. The name of the file is
     "animatlabSimDir.txt" that is stored in the AnimatLabSimulationAPI folder)
     This function has been added line 75
@@ -42,6 +42,22 @@ modified August 18 2017
     self.optSet is now defined as self.optSet in class ReadAsimAform
 modified August 22 2017
     procedure to choose twitStMusclesStNbs is now implemented
+Modified August 28,2017:
+    new procedure lines 1306-1314. Two new functions crearted :
+        readAnimatLabV2ProgDir() and saveAnimatLabV2ProgDir()
+     animatLabV2ProgDir = readAnimatLabV2ProgDir()
+     dialogue = "Choose the folder where animatLab V2 is stored (includes/bin)"
+     if animatLabV2ProgDir == '':
+        print "first instance to access to animatLab V2/bin"
+        form.animatLabV2ProgDir = QtWidgets.QFileDialog.\
+            getExistingDirectory(form, dialogue)
+        print form.animatLabV2ProgDir
+        saveAnimatLabV2ProgDir(str(form.animatLabV2ProgDir))
+        print "animatLab V2/bin path is saved in animatlabV2ProgDir.txt"
+
+    to ask for path of the AnimatLabV2 program directory. This path is saved in
+    a text file named:"readAnimatLabV2ProgDir.txt" in the working directory.
+    If this file exists then the path is red and is no more asked for.
 @author: cattaert
 """
 
@@ -89,7 +105,19 @@ except AttributeError:
         return QtWidgets.QApplication.translate(context, text, disambig)
 
 
-def readAnimatLabDir():
+def readAnimatLabV2ProgDir():
+    filename = "animatlabV2ProgDir.txt"
+    try:
+        fic = open(filename, 'r')
+        directory = fic.readline()
+        fic.close()
+    except:
+        directory = ""
+    # print "First instance: Root directory will be created from GUI"
+    return directory
+
+
+def readAnimatLabSimDir():
     filename = "animatlabSimDir.txt"
     try:
         fic = open(filename, 'r')
@@ -303,6 +331,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.model = None
         self.projMan = None
         self.optSet = None
+        self.animatLabV2ProgDir = None
 
     def loadParams(self, paramFicName, listparNameOpt):
         """
@@ -720,7 +749,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # global folders, sims, model, projman
         # self.listWidget.clear()     # If there are any elements in the list
 
-        animatsimdir = readAnimatLabDir()
+        animatsimdir = readAnimatLabSimDir()
         if animatsimdir != "":
             subdir = os.path.split(animatsimdir)[-1]
             rootname = os.path.dirname(animatsimdir)
@@ -743,9 +772,10 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             rootname = os.path.dirname(dirname)
             rootname += "/"
             self.folders = FolderOrg(animatlab_rootFolder=rootname,
-                                     subdir=subdir)
+                                     subdir=subdir,
+                                     python27_source_dir=self.animatLabV2ProgDir)
             self.folders.affectDirectories()
-            saveAnimatLabDir(dirname)
+            saveAnimatLabSimDir(dirname)
 
             # ################################################################
             #                  Creation of sims & initialisation             #
@@ -1245,11 +1275,21 @@ def saveParams(paramFicName, optSet):
     print "&&&&&& File saved :", paramFicName, "  &&&&&&"
 
 
-def saveAnimatLabDir(directory):
+def saveAnimatLabSimDir(directory):
     """
     doc string
     """
     filename = "animatlabSimDir.txt"
+    fic = open(filename, 'w')
+    fic.write(directory)
+    fic.close()
+
+
+def saveAnimatLabV2ProgDir(directory):
+    """
+    doc string
+    """
+    filename = "animatlabV2ProgDir.txt"
     fic = open(filename, 'w')
     fic.write(directory)
     fic.close()
@@ -1263,6 +1303,17 @@ def main():
     app = QtWidgets.QApplication(sys.argv)  # A new instance of QApplicationPWD
     # app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     form = ReadAsimAform()  # We set the form to be our ExampleApp (design)
+
+    animatLabV2ProgDir = readAnimatLabV2ProgDir()
+    dialogue = "Choose the folder where animatLab V2 is stored (includes/bin)"
+    if animatLabV2ProgDir == '':
+        print "first instance to access to animatLab V2/bin"
+        form.animatLabV2ProgDir = QtWidgets.QFileDialog.\
+            getExistingDirectory(form, dialogue)
+        print form.animatLabV2ProgDir
+        saveAnimatLabV2ProgDir(str(form.animatLabV2ProgDir))
+        print "animatLab V2/bin path is saved in animatlabV2ProgDir.txt"
+
     form.show()  # Show the form
     app.exec_()  # and execute the app
 
