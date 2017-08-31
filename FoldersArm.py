@@ -5,7 +5,27 @@ Modified on Fri Oct 07 17:47:25 2016
 @author: Daniel cattaert
 modified August 24, 2017:
     python27_source_dir is now given in the call to the class
+modified August 31, 2017:
+    Now creates the required folders associated with the root folder
+    (if they do not exist)
+    commonFiles_dir, simFiles_dir and result_dir
+    Moreover, the files present in the root dir are copied in the simFiles_dir
 """
+import os
+import shutil
+
+
+def copyFileDir(sourcedir, destdir, copy_dir=0):
+    if not os.path.exists(destdir):
+        os.makedirs(destdir)
+    for f in os.listdir(sourcedir):
+        src = os.path.join(sourcedir, f)
+        tgt = os.path.join(destdir, f)
+        if os.path.isdir(src):
+            if copy_dir:
+                shutil.copytree(src, tgt)
+        else:
+            shutil.copy(src, tgt)
 
 
 class FolderOrg():
@@ -34,14 +54,23 @@ class FolderOrg():
         self.animatlab_commonFiles_dir=self.animatlab_rootFolder+"FinalModel/"
         self.animatlab_simFiles_dir = self.animatlab_rootFolder + "SimFiles/"
         self.animatlab_result_dir = self.animatlab_rootFolder + "ResultFiles/"
-        #if self.python27_source_dir == "":
-        #    self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"
+        # if self.python27_source_dir == "":
+        #  self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"
         print self.animatlab_rootFolder
         print self.animatlab_commonFiles_dir
         print self.animatlab_simFiles_dir
         print self.animatlab_result_dir
         print self.python27_source_dir
 
+        if not os.path.exists(self.animatlab_commonFiles_dir):
+            os.makedirs(self.animatlab_commonFiles_dir)
+            copyFileDir(self.animatlab_rootFolder,
+                        self.animatlab_commonFiles_dir,
+                        copy_dir=0)
+        if not os.path.exists(self.animatlab_simFiles_dir):
+            os.makedirs(self.animatlab_simFiles_dir)
+        if not os.path.exists(self.animatlab_result_dir):
+            os.makedirs(self.animatlab_result_dir)
 
 if __name__ == '__main__':
     folders = FolderOrg(subdir="subtest")
