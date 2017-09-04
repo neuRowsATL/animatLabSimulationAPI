@@ -44,6 +44,11 @@ Modified August 28, 2017:
                 list_asim.append(f)
     return list_asim
   the mainOpt.py has been implemented accordingly
+Modified September 1, 2017:
+    bug fixed line 637 (2 lines commented)
+        # else:
+        #     chartN = ""
+
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -145,6 +150,63 @@ def findFirstType(model, Type):
     return firstType
 
 
+def affichMotor(model, motorStimuli, show):
+    # find elements by type:   MotorPosition, MotorVelocity
+    tabMotorVal = []
+    i = 0
+    motorName, motorType, start_motor, end_motor = [], [], [], []
+    speed, enabled_motor = [], []
+    jointID, jointName = [], []
+    for i in range(len(motorStimuli)):
+        motorEl = motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            motorName.append(motorEl[idx].find("Name").text)
+            motorType.append(motorEl[idx].find("Type").text)
+            start_motor.append(float(motorEl[idx].find("StartTime").text))
+            end_motor.append(float(motorEl[idx].find("EndTime").text))
+            speed.append(float(motorEl[idx].find("Equation").text))
+            enabled_motor.append(motorEl[idx].find("Enabled").text)
+            jID = motorEl[idx].find("JointID").text
+            jointID.append(jID)
+            tmpjointName = model.getElementByID(jID).find("Name").text
+            jointName.append(tmpjointName)
+    # ... and print them
+    if show == 1:
+        print '\n'
+        print "list of motor stimuli "
+    i = 0
+    while i < len(motorName):
+        if show == 1:
+            txt0 = '[{:02d}] '.format(i)
+            txt1 = str(motorName[i])
+            for k in range(3-((len(txt1)+5)/8)):
+                txt1 += "\t"
+            txt2 = "Type:{}; ".format(motorType[i])
+            txt3 = '  {};  \tStartTime:{:6.2f};   EndTime:{:6.2f};'
+            ftxt3 = txt3.format(jointName[i],
+                                start_motor[i],
+                                end_motor[i])
+            if motorType[i] == "MotorPosition":
+                label = "position"
+            elif motorType[i] == "MotorVelocity":
+                label = "velocity"
+            txt4 = '   {}:{:5.2f};\tEnabled:{}'.format(label, speed[i],
+                                                       enabled_motor[i])
+            print txt0 + txt1 + txt2 + ftxt3 + txt4
+
+        tabMotorVal.append([
+                            motorName[i],
+                            start_motor[i],
+                            end_motor[i],
+                            speed[i],
+                            enabled_motor[i],
+                            jointID[i]
+                           ]
+                           )
+        i = i+1
+    return tabMotorVal
+
+
 def affichExtStim(ExternalStimuli, show):
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
@@ -165,7 +227,6 @@ def affichExtStim(ExternalStimuli, show):
         i = i+1
     # ... and print them
     if show == 1:
-        print '\n'
         print "list of external stimuli"
     i = 0
     while i < len(ExternalStimuli):
@@ -309,8 +370,11 @@ def affichConnexions(model, Connexions, show):
     nbConnexions = len(Connexions)
     for i in range(nbConnexions):
         if show == 1:
-            txt = '[%2d] \t%s;\tSynAmp:%4.2f;\tThr:%4.2f\tGMax:%4.2f;\t'
-            txt = txt + 'Equil:%4.2f; \t%s;\t%s->%s'
+            space = ""
+            for k in range(4-((len(synapseName[i])+7)/8)):
+                space += "\t"
+            txt = '[%2d]  %s;' + space + 'SynAmp:%4.2f;\tThr:%4.2f;'
+            txt = txt + '\tGMax:%4.2f;\tEquil:%4.2f; \t%s;\t%s->%s'
             print txt % (
                         i,
                         synapseName[i],
@@ -451,8 +515,8 @@ def getSimSetFromAsim(optSet,
                       seriesStimParam, seriesSynParam, seriesSynFRParam,
                       asimFileName):
     asimModel = AnimatLabModel.AnimatLabSimFile(asimFileName)
-    asimExternalStimuli = asimModel.getElementByType("ExternalStimuli")
-    asimtab_stims = affichExtStim(asimExternalStimuli, 1)
+    asimreadAnimatLabSimDir = asimModel.getElementByType("readAnimatLabSimDir")
+    asimtab_stims = affichExtStim(asimreadAnimatLabSimDir, 1)
 
     asimConnexions = asimModel.getElementByType("Connexions")
     asimtab_connexions = affichConnexions(asimModel, asimConnexions, 1)
@@ -556,7 +620,7 @@ def get_filepaths(directory):
 def findList_asimFiles(directory):
     list_asim = []
     if not os.path.exists(directory):
-        print "No such directory exists !!!!!!"
+        print directory, "does not exist !!!!!!"
     else:
         onlyfiles = [f for f in listdir(directory)
                      if isfile(join(directory, f))]
@@ -579,8 +643,8 @@ def findChartName(directory):
             # print f
             chartN = f[:f.find('.')]
             # print chartN
-        else:
-            chartN = ""
+        # else:
+        #     chartN = ""
     for f in onlyfiles:
         if f.endswith(".asim"):
             # print f
@@ -599,7 +663,7 @@ def findTxtFileName(folders, x):
 
 
 def findFreq(folders, model, projMan, mvtcolumn):
-    stim = model.getElementByType("ExternalStimuli")
+    stim = model.getElementByType("readAnimatLabSimDir")
     stimName = stim[0].find("Name").text
     initval = float(stim[0].find("CurrentOn").text)
     simSet = SimulationSet.SimulationSet()
@@ -1293,7 +1357,8 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
 
 
 def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
-                      ExternalStimuli, tab_stims, listeNeurons, listeNeuronsFR,
+                      readAnimatLabSimDir, tab_stims, listeNeurons,
+                      listeNeuronsFR,
                       mvtcolumn, mnCol, rate, lineStart, lineEnd,
                       rang, step, trial, epoch,
                       deltaStim, maxDeltaStim, limits, limQuality,
@@ -1320,7 +1385,7 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
         if value_minus < 0:
             value_minus = 0
         if paramName == 'EndTime':
-            start_time = float(ExternalStimuli[stimRank]
+            start_time = float(readAnimatLabSimDir[stimRank]
                                .find('StartTime').text)
             end_time = value_minus
             if end_time < start_time:
@@ -1328,7 +1393,7 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
                 value_minus = end_time
         if paramName == 'StartTime':
             start_time = value_plus
-            end_time = float(ExternalStimuli[stimRank].find('EndTime').text)
+            end_time = float(readAnimatLabSimDir[stimRank].find('EndTime').text)
             if end_time < start_time:
                 start_time = end_time - 0.01
                 value_plus = start_time
@@ -1355,7 +1420,8 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
 
 
 def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
-                     ExternalStimuli, tab_stims, listeNeurons, listeNeuronsFR,
+                     readAnimatLabSimDir, tab_stims, listeNeurons,
+                     listeNeuronsFR,
                      mvtcolumn, mnCol, rate, lineStart, lineEnd,
                      rang, trial, epoch,
                      deltaStim, maxDeltaStim, limits, limQuality,
@@ -1371,7 +1437,7 @@ def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
     while step < nbsteps:
         result = runThreeStimTests(folders, model, projMan, simSet,
                                    stimRank, paramName,
-                                   ExternalStimuli, tab_stims,
+                                   readAnimatLabSimDir, tab_stims,
                                    listeNeurons, listeNeuronsFR,
                                    mvtcolumn, mnCol, rate, lineStart, lineEnd,
                                    rang, step, trial, epoch,
@@ -2156,6 +2222,25 @@ def enableStims(ExternalStimuli, stims):
         ExternalStimuli[stimRank].find("Enabled").text = 'True'
 
 
+def setMotorStimsOff(model, motorStimuli):
+    """
+    sets motors stimulis to "disabled"
+    """
+    for i in range(len(motorStimuli)):
+        motorEl = motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            nomMoteur = elem.find("Name").text
+            print nomMoteur,
+            space = ""
+            for sp in range(3-len(nomMoteur)/8):
+                space += "\t"
+            print space + "set from  ",
+            print elem.find("Enabled").text,
+            elem.find("Enabled").text = "False"
+            print "   to   ", elem.find("Enabled").text
+    affichMotor(model, motorStimuli, 1)
+
+
 def setPlaybackControlMode(model, mode):
     """
     sets speed to 0 for Fastest and to 1 for matching Physics Steps
@@ -2290,7 +2375,7 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
         ExternalStimuli[stimRank].find("Enabled").text = 'True'
         ExternalStimuli[stimRank].find("StartTime").text = str(startTwitch)
         ExternalStimuli[stimRank].find("EndTime").text = str(endTwitch)
-        tab_stims = affichExtStim(ExternalStimuli, 0)  # 0 -> no print
+        tab_stims = affichExtStim(ExternalStimuli, 1)  # 0 -> no print
         model.saveXML(overwrite=True)
         simSet.samplePts = []
         simSet.set_by_range({stimName[ii] + ".CurrentOn": twitchAmpSet})
