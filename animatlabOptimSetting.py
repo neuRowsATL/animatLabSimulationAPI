@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """
+version 17
 Created on Wed Mar 01 10:25:16 2017
-Command board to select stimuli and synapses to optimize
-version 14
-
-Modified by cattaert June 08 2017
-     Disabled list of synapses corrected line 492 & line 510    
+Class that contains all parameters, stimuli and synapses for optimization
 @author: cattaert
+Modified by cattaert June 08 2017
+     Disabled list of synapses corrected line 492 & line 510
+
+Modified by cattaert September 1, 2017:
+    added handling of motorStims (self.motorStimuli, self.nbmotors,
+    self.tab_motors)
 """
 
 import random
@@ -16,6 +19,7 @@ import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 from optimization import liste, findFirstType
 from optimization import affichChartColumn, affichExtStim, affichNeurons
+from optimization import affichMotor
 from optimization import affichConnexions, affichNeuronsFR, affichConnexionsFR
 from optimization import enableStims, formTemplateSmooth, savecurve
 
@@ -52,6 +56,19 @@ class OptimizeSimSettings():
         self.chartStart = float(self.chart[0].find("StartTime").text)
         self.ChartColumns = model.getElementByType("ChartcolName")
         self.ExternalStimuli = model.getElementByType("ExternalStimuli")
+        self.motorP = model.getElementByType("MotorPosition")
+        self.motorV = model.getElementByType("MotorVelocity")
+        self.motorStimuli = [self.motorP, self.motorV]
+        self.joints = model.getElementByType("Joint")
+        self.jointName = []
+        self.jointLimUp = []
+        self.jointLimDwn = []
+        for jointNb in range(len(self.joints)):
+            self.jointName.append(self.joints[jointNb].find("Name").text)
+            limUp = self.joints[jointNb].find("UpperLimit")
+            self.jointLimUp.append(float(limUp.find("LimitPos").text))
+            limDwn = self.joints[jointNb].find("LowerLimit")
+            self.jointLimDwn.append(float(limDwn.find("LimitPos").text))
         self.Neurons = model.getElementByType("Neurons")
         self.NeuronsFR = model.getElementByType("NeuronsFR")
         self.Adapters = model.getElementByType("Adapters")
@@ -59,12 +76,14 @@ class OptimizeSimSettings():
         self.SynapsesFR = model.getElementByType("SynapsesFR")
         self.Connexions = model.getElementByType("Connexions")
         self.nbStims = len(self.ExternalStimuli)
+        self.nbmotors = len(self.motorP) + len(self.motorV)
         self.nbNeurons = len(self.Neurons)
         self.nbAdapters = len(self.Adapters)
         self.nbSynapses = len(self.Synapses)
         self.nbConnexions = len(self.Connexions)
         self.nbNeuronsFR = len(self.NeuronsFR)
         self.nbSynapsesFR = len(self.SynapsesFR)
+        self.tab_motors = affichMotor(model, self.motorStimuli, 1)
         self.tab_chartcolumns = affichChartColumn(self.ChartColumns, 0)
         self.tab_stims = affichExtStim(self.ExternalStimuli, 1)  # 1 for print
         self.tab_neurons = affichNeurons(self.Neurons, 1)
@@ -259,6 +278,9 @@ class OptimizeSimSettings():
         self.stimName = []
         for i in range(len(self.tab_stims)):
             self.stimName.append(self.tab_stims[i][0])
+        self.motorName = []
+        for i in range(len(self.tab_motors)):
+            self.motorName.append(self.tab_motors[i][0])
         self.connexName = []
         for i in range(len(self.tab_connexions)):
             self. connexName.append(self.tab_connexions[i][0])
@@ -350,6 +372,7 @@ class OptimizeSimSettings():
                     self.synMax.append(self.maxWeight)
 
     def actualizeparamMarquez(self):
+        print "actualizing Marquez params"
         # Creation of a dictionary for Marquez parameter handling
         self.paramMarquez = {}
         i = 0
@@ -386,13 +409,14 @@ class OptimizeSimSettings():
         self.twitStMusclesStNbs = self.paramMarquez['twitStMusclesStNbs']
         self.twitStMusclesStNames = []
         for i in self.twitStMusclesStNbs:
-            self.twitStMusclesStNames.append(self.chartColNames[i])
+            self.twitStMusclesStNames.append(self.stimName[i])
         self.nbruns = self.paramMarquez['nbruns']
         self.timeMes = self.paramMarquez['timeMes']
         self.delay = self.paramMarquez['delay']
         self.eta = self.paramMarquez['eta']
 
     def actualizeparamLoeb(self):
+        print "actualizing Loeb params"
         # Creation of a dictionary for optimization parameter handling
         self.paramOpt = {}
         i = 0
@@ -459,8 +483,9 @@ class OptimizeSimSettings():
                 self.stimList.append(stimRank)
         # enabled external stimuli --> 'true'
         enableStims(self.ExternalStimuli, self.stimList)
-        print "\n enabled external stimuli set to 'true'",
-        print "and excluded to 'false'"
+        print "Enabled external stimuli set to 'true' and excluded to 'false'"
+        self.tab_stims = affichExtStim(self.ExternalStimuli, 1)
+        print
         self.listStim = []  # list of stim to be explored in the optimization
         for stim in range(len(self.stimList)):
             stimRank = self.stimList[stim]
@@ -468,7 +493,7 @@ class OptimizeSimSettings():
                 self.listStim.append(stimRank)           # 'dontChangeStimNbs'
         # After changing a property, save the updated model
         self.model.saveXML(overwrite=True)   # in the FinalModel dir
-        self.tab_stims = affichExtStim(self.ExternalStimuli, 1)  # 1 for print
+        self.tab_stims = affichExtStim(self.ExternalStimuli, 0)  # 1 for print
         self.stimsTot = self.listStim  # excluded stims are removed from list
         self.orderedstimsTot = []
         for i in range(len(self.stimsTot)):
