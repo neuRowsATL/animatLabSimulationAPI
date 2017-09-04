@@ -67,8 +67,21 @@ from optimization import savechartfile, writeBestResSuite
 from optimization import writeaddTab, testquality, copyRenameFile
 from optimization import findList_asimFiles
 from optimization import getSimSetFromAsim
+from optimization import setMotorStimsOff
+from optimization import affichExtStim
+from optimization import affichMotor
+from optimization import copyFile
+
 # from optimization import getlistparam
 from cma import fmin
+
+
+def show_tab_extstim():
+    optSet.tab_stims = affichExtStim(optSet.ExternalStimuli, 1)
+
+
+def show_tab_motorstim():
+    optSet.tab_motors = affichMotor(model, optSet.motorStimuli, 1)
 
 
 def readAnimatLabV2ProgDir():
@@ -93,31 +106,10 @@ def readAnimatLabDir():
         directory = ""
     return directory
 
-animatsimdir = readAnimatLabDir()
-animatLabV2ProgDir = readAnimatLabV2ProgDir()
-if animatsimdir != "":
-    subdir = os.path.split(animatsimdir)[-1]
-    print subdir
-    rootname = os.path.dirname(animatsimdir)
-    rootname += "/"
-    folders = FolderOrg(animatlab_rootFolder=rootname,
-                        python27_source_dir=animatLabV2ProgDir,
-                        subdir=subdir)
-    folders.affectDirectories()
-else:
-    print "No selected directory  run GUI_AnimatLabOptimization.py"
-    quit
-"""
-if not os.path.exists(folders.animatlab_result_dir):
-        os.makedirs(folders.animatlab_result_dir)
-
-if not os.path.exists(folders.animatlab_simFiles_dir):
-        os.makedirs(folders.animatlab_simFiles_dir)
-"""
-
 
 def loadParams(paramFicName, optSet):
         try:
+            print
             print "looking paramOpt file:", paramFicName
             with open(paramFicName, 'rb') as input:
                 optSet.paramLoebName = pickle.load(input)
@@ -138,14 +130,14 @@ def loadParams(paramFicName, optSet):
                 print "paramMarquez :"
                 optSet.printParams(optSet.paramMarquezName,
                                    optSet.paramMarquezValue)
-                print '====  Param loaded  ===='
+                print '===================  Param loaded  ===================='
                 response = True
             else:
                 print "Mismatch between existing and actual parameter files"
                 response = False
         except:
-            print "No parameter file with this name in the directory"
-            print "NEEDs to create a new parameter file"
+            # print "No parameter file with this name in the directory",
+            # print "NEEDs to create a new parameter file"
             response = False
         return response
 
@@ -236,6 +228,101 @@ def saveparams(filename):
     comment = ""
     writeaddTab(folders, listparnam, filename, 'w', comment, 0)
     writeaddTab(folders, listparval, filename, 'a', comment, 0)
+
+
+def setAnglePos(jointNb, motorName, val, motorStart, motorEnd):
+    """
+
+    """
+    # ====== copying original asim File to Temp Directory  ========
+    print "copying original asim File to Temp Directory"
+    simFileName = findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
+    sourceDir = folders.animatlab_commonFiles_dir
+    destDir = folders.animatlab_rootFolder + "temp/"
+    if not os.path.exists(destDir):
+        os.makedirs(destDir)
+    copyFile(simFileName, sourceDir, destDir)
+    # ============= Disable all external Stimuli...  ==============
+    for stim in range(optSet.nbStims):
+        optSet.ExternalStimuli[stim].find("Enabled").text = 'False'
+    # ====== prepares simSet for mvt control and runprojMan  ======
+    chartRootName = "imposedMaxAmplMvt"
+    simSet = SimulationSet.SimulationSet()
+    simSet.samplePts = []
+    for idx in range(len(motorName)):
+        simSet.set_by_range({motorName[idx] + ".Equation": [val[idx]]})
+        simSet.set_by_range({motorName[idx] + ".StartTime": [motorStart[idx]]})
+        simSet.set_by_range({motorName[idx] + ".EndTime": [motorEnd[idx]]})
+    print simSet.samplePts
+    projMan.make_asims(simSet)
+    projMan.run(cores=-1)
+    # ================== Saves the chart result  ==================
+    tab = tablo(folders, findTxtFileName(folders, 1))
+    comment = ""
+    destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
+    chartname = savechartfile(chartRootName, destdir, tab, comment)
+    print "... chart file {} saved; {}".format(chartname, comment)
+    # ================== Modifies the asim file  ==================
+    for idx in range(len(motorName)):
+        motorstim = model.getElementByName(motorName[idx])
+        motorstim.find("Equation").text = str(val[idx])
+        motorstim.find("StartTime").text = str(motorStart[idx])
+        motorstim.find("EndTime").text = str(motorEnd[idx])
+        motorstim.find("Enabled").text = "True"
+    # ================== Saves the new asim file ==================
+    model.saveXML(overwrite=True)
+    show_tab_extstim()
+    show_tab_motorstim()
+    # ===== copying original asim File back to FinalModel Directory  ======
+    print "\ncopying original asim File back to FinalModel Directory"
+    sourceDir = folders.animatlab_rootFolder + "temp/"
+    destDir = folders.animatlab_commonFiles_dir
+    copyFile(simFileName, sourceDir, destDir)
+
+
+def setMusclesandSpindles():
+    """
+
+    """
+    # Prepares the motor -driven movement for max amplitudes
+    motorName, motorType = [], []
+    val, motorStart, motorEnd = [], [], []
+    jointNb = 0
+    mindeg = (optSet.jointLimDwn[jointNb])*180/3.1415926
+    maxdeg = (optSet.jointLimUp[jointNb])*180/3.1415926
+    print "set Muscles and Spindles"
+    print "\t\t\t", "radians", "\t\t\t", "degres"
+    print "limits \t",
+    print optSet.jointName[jointNb],
+    print "[", optSet.jointLimDwn[jointNb],
+    print "-->",
+    print optSet.jointLimUp[jointNb], "]",
+    print "[", mindeg, "-->", maxdeg, "]"
+    j = 0
+    for i in range(len(optSet.motorStimuli)):
+        motorEl = optSet.motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            motorName.append(elem.find("Name").text)
+            motorType.append(elem.find("Type").text)
+            txt1 = ""
+            for k in range(3-((len(motorName[j])+0)/8)):
+                txt1 += "\t"
+            # val.append(optSet.jointLimDwn[jointNb])
+            val.append(float(elem.find("Equation").text))
+            motorStart.append(float(elem.find("StartTime").text))
+            motorEnd.append(float(elem.find("EndTime").text))
+            if motorType[j] == "MotorPosition":
+                # set initial position to min angle
+                val[j] = optSet.jointLimDwn[jointNb]
+            print motorName[j], txt1, motorType[j], "\t", motorStart[j],
+            print "\t", motorEnd[j], "\t", val[j]
+            j += 1
+    setAnglePos(jointNb, motorName, val, motorStart, motorEnd)
+
+# TODO : continuer l'implementation utiliser les moteurs pour démarrer à
+# optSet.jointLimDwn
+#  et faire mesure des muscles et spindles, puis aller en optSet.jointLimUp
+#  et refaire les mesures
 
 
 def execMarquez():
@@ -413,6 +500,22 @@ def actualiseSaveAprojFromAsim(asimFileName):
 if __name__ == '__main__':
     """
     """
+
+    animatsimdir = readAnimatLabDir()
+    animatLabV2ProgDir = readAnimatLabV2ProgDir()
+    if animatsimdir != "":
+        subdir = os.path.split(animatsimdir)[-1]
+        print subdir
+        rootname = os.path.dirname(animatsimdir)
+        rootname += "/"
+        folders = FolderOrg(animatlab_rootFolder=rootname,
+                            python27_source_dir=animatLabV2ProgDir,
+                            subdir=subdir)
+        folders.affectDirectories()
+    else:
+        print "No selected directory  run GUI_AnimatLabOptimization.py"
+        quit
+
     if animatsimdir != "":
         sims = AnimatLabSimRunner.AnimatLabSimulationRunner("Test Sims",
             rootFolder = folders.animatlab_rootFolder,
@@ -428,6 +531,7 @@ if __name__ == '__main__':
         print
         listparNameOpt = optSet.paramLoebName
         setPlaybackControlMode(model, mode=0)
+        setMotorStimsOff(model, optSet.motorStimuli)
         # Looks for a parameter file in the chosen directory
         fileName = 'paramOpt.pkl'
         if loadParams(folders.animatlab_result_dir + fileName, optSet):
@@ -442,7 +546,8 @@ if __name__ == '__main__':
             listparCoulMarquez = optSet.paramMarquezCoul
             optSet.actualizeparamMarquez()
         else:
-            print "No param file found, run 'GUI_animatlabOptimization.py'"
+            print "paramOpt.pkl MISSING !!, run 'GUI_animatlabOptimization.py'"
+            print
 
         writeTitres(folders, 'stim', optSet.allPhasesStim,
                     optSet.tab_stims, optSet.seriesStimParam)
@@ -450,6 +555,10 @@ if __name__ == '__main__':
                     optSet.tab_connexions, optSet.seriesSynParam)
         writeTitres(folders, 'synFR', optSet.allPhasesSynFR,
                     optSet.tab_connexionsFR, optSet.seriesSynFRParam)
+
+        # ###################################################################
+        # setMusclesandSpindles()
+        # ###################################################################
 
         # ###################################################################
         # execMarquez()
