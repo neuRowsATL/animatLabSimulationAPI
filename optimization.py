@@ -3,6 +3,52 @@
 Created on Mon Jan 23 10:13:39 2017
 
 @author: cattaert
+
+modified June20, 2017 (D. Cattaert):
+    corrected the call to enableStimuli() because one argument was missing
+    enableStims(ExternalStimuli, twitStMusclesSt)
+
+modified June22, 2017 (D. Cattaert):
+    corrected the amount of current used for twitches in Marquez procedure
+    line 2185: twitchAmpSet = [5.0000e-09] (instead of 50.0000e-09)
+
+modified June23, 2017 (D. Cattaert):
+    added date & time in saved files
+
+modified June29, 2017 (D. Cattaert):
+    modified runMarquez procedure
+    modified writeWeightMarquezTab
+modified August 24, 2017 (D. Cattaert):
+    getSimSetFromAsim changed list of parameter called
+    seriesStimParam, seriesSynParam, seriesSynFRParam
+    in order to choose the parameters rather than take it from optSet class
+
+    getlistparam was changed accordingly
+Modified August 28, 2017:
+   all asim Files created in the Marquez procedure are now saved in the floder
+   FinalTwitchModel
+   new procedures created:
+    def findList_asimFiles(directory):
+    list_asim = []
+    if not os.path.exists(directory):
+        print "No such directory exists !!!!!!"
+    else:
+        onlyfiles = [f for f in listdir(directory)
+                     if isfile(join(directory, f))]
+        # print onlyfiles
+        for f in onlyfiles:
+            if f.endswith(".asim"):
+                # print f
+                # simN = f[:f.find('.')]
+                # print simN
+                list_asim.append(f)
+    return list_asim
+  the mainOpt.py has been implemented accordingly
+Modified September 1, 2017:
+    bug fixed line 637 (2 lines commented)
+        # else:
+        #     chartN = ""
+
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -23,6 +69,7 @@ from os.path import isfile, join
 # import class_chartData as chartData
 from math import sqrt
 # from copy import deepcopy
+import datetime
 
 global verbose
 verbose = 3  # niveau de dialogue avec la machine
@@ -103,6 +150,63 @@ def findFirstType(model, Type):
     return firstType
 
 
+def affichMotor(model, motorStimuli, show):
+    # find elements by type:   MotorPosition, MotorVelocity
+    tabMotorVal = []
+    i = 0
+    motorName, motorType, start_motor, end_motor = [], [], [], []
+    speed, enabled_motor = [], []
+    jointID, jointName = [], []
+    for i in range(len(motorStimuli)):
+        motorEl = motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            motorName.append(motorEl[idx].find("Name").text)
+            motorType.append(motorEl[idx].find("Type").text)
+            start_motor.append(float(motorEl[idx].find("StartTime").text))
+            end_motor.append(float(motorEl[idx].find("EndTime").text))
+            speed.append(float(motorEl[idx].find("Equation").text))
+            enabled_motor.append(motorEl[idx].find("Enabled").text)
+            jID = motorEl[idx].find("JointID").text
+            jointID.append(jID)
+            tmpjointName = model.getElementByID(jID).find("Name").text
+            jointName.append(tmpjointName)
+    # ... and print them
+    if show == 1:
+        print '\n'
+        print "list of motor stimuli "
+    i = 0
+    while i < len(motorName):
+        if show == 1:
+            txt0 = '[{:02d}] '.format(i)
+            txt1 = str(motorName[i])
+            for k in range(3-((len(txt1)+5)/8)):
+                txt1 += "\t"
+            txt2 = "Type:{}; ".format(motorType[i])
+            txt3 = '  {};  \tStartTime:{:6.2f};   EndTime:{:6.2f};'
+            ftxt3 = txt3.format(jointName[i],
+                                start_motor[i],
+                                end_motor[i])
+            if motorType[i] == "MotorPosition":
+                label = "position"
+            elif motorType[i] == "MotorVelocity":
+                label = "velocity"
+            txt4 = '   {}:{:5.2f};\tEnabled:{}'.format(label, speed[i],
+                                                       enabled_motor[i])
+            print txt0 + txt1 + txt2 + ftxt3 + txt4
+
+        tabMotorVal.append([
+                            motorName[i],
+                            start_motor[i],
+                            end_motor[i],
+                            speed[i],
+                            enabled_motor[i],
+                            jointID[i]
+                           ]
+                           )
+        i = i+1
+    return tabMotorVal
+
+
 def affichExtStim(ExternalStimuli, show):
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
@@ -123,7 +227,6 @@ def affichExtStim(ExternalStimuli, show):
         i = i+1
     # ... and print them
     if show == 1:
-        print '\n'
         print "list of external stimuli"
     i = 0
     while i < len(ExternalStimuli):
@@ -267,8 +370,11 @@ def affichConnexions(model, Connexions, show):
     nbConnexions = len(Connexions)
     for i in range(nbConnexions):
         if show == 1:
-            txt = '[%2d] \t%s;\tSynAmp:%4.2f;\tThr:%4.2f\tGMax:%4.2f;\t'
-            txt = txt + 'Equil:%4.2f; \t%s;\t%s->%s'
+            space = ""
+            for k in range(4-((len(synapseName[i])+7)/8)):
+                space += "\t"
+            txt = '[%2d]  %s;' + space + 'SynAmp:%4.2f;\tThr:%4.2f;'
+            txt = txt + '\tGMax:%4.2f;\tEquil:%4.2f; \t%s;\t%s->%s'
             print txt % (
                         i,
                         synapseName[i],
@@ -350,7 +456,8 @@ def affichConnexionsFR(model, SynapsesFR, show):
     return tabConnexionsFR
 
 
-def getlistparam(optSet, asimtab_stims,
+def getlistparam(optSet, seriesStimParam, seriesSynParam, seriesSynFRParam,
+                 asimtab_stims,
                  asimtab_connexions,
                  asimtab_connexionsFR):
     v = []
@@ -359,8 +466,8 @@ def getlistparam(optSet, asimtab_stims,
     synFRName = []
     listSt = optSet.stimsTot
 
-    for param in range(len(optSet.seriesStimParam)):
-        paramName = optSet.seriesStimParam[param]
+    for param in range(len(seriesStimParam)):
+        paramName = seriesStimParam[param]
         if paramName == "StartTime":
             for stim in range(len(listSt)):
                 v.append(asimtab_stims[listSt[stim]][1])
@@ -379,8 +486,8 @@ def getlistparam(optSet, asimtab_stims,
                 v.append(x0stimtmp)
                 stimName.append(asimtab_stims[listSt[stim]][0] + "." +
                                 paramName)
-    for synparam in range(len(optSet.seriesSynParam)):
-        synparamName = optSet.seriesSynParam[synparam]
+    for synparam in range(len(seriesSynParam)):
+        synparamName = seriesSynParam[synparam]
         if synparamName == 'G':
             firstConnexion = findFirstType(optSet.model, "Connexions")
             for syn in range(len(optSet.synList)):
@@ -389,8 +496,8 @@ def getlistparam(optSet, asimtab_stims,
                 synName.append(temp)
                 x0syntmp = asimtab_connexions[optSet.synList[syn]][3]
                 v.append(x0syntmp)
-    for synparam in range(len(optSet.seriesSynFRParam)):
-        synparamName = optSet.seriesSynFRParam[synparam]
+    for synparam in range(len(seriesSynFRParam)):
+        synparamName = seriesSynFRParam[synparam]
         if synparamName == "Weight":
             firstConnexion = findFirstType(optSet.model, "SynapsesFR")
             for synFR in range(len(optSet.synListFR)):
@@ -404,10 +511,12 @@ def getlistparam(optSet, asimtab_stims,
     return result
 
 
-def getSimSetFromAsim(optSet, asimFileName):
+def getSimSetFromAsim(optSet,
+                      seriesStimParam, seriesSynParam, seriesSynFRParam,
+                      asimFileName):
     asimModel = AnimatLabModel.AnimatLabSimFile(asimFileName)
-    asimExternalStimuli = asimModel.getElementByType("ExternalStimuli")
-    asimtab_stims = affichExtStim(asimExternalStimuli, 1)
+    asimreadAnimatLabSimDir = asimModel.getElementByType("readAnimatLabSimDir")
+    asimtab_stims = affichExtStim(asimreadAnimatLabSimDir, 1)
 
     asimConnexions = asimModel.getElementByType("Connexions")
     asimtab_connexions = affichConnexions(asimModel, asimConnexions, 1)
@@ -415,7 +524,9 @@ def getSimSetFromAsim(optSet, asimFileName):
     asimSynapsesFR = asimModel.getElementByType("SynapsesFR")
     asimtab_connexionsFR = affichConnexionsFR(asimModel, asimSynapsesFR, 1)
     # initlistparam()
-    res = getlistparam(optSet, asimtab_stims,
+    res = getlistparam(optSet,
+                       seriesStimParam, seriesSynParam, seriesSynFRParam,
+                       asimtab_stims,
                        asimtab_connexions,
                        asimtab_connexionsFR)
     [listSt, v, stimParName, synParName, synFRParName] = res
@@ -506,6 +617,23 @@ def get_filepaths(directory):
     return file_paths  # Self-explanatory.
 
 
+def findList_asimFiles(directory):
+    list_asim = []
+    if not os.path.exists(directory):
+        print directory, "does not exist !!!!!!"
+    else:
+        onlyfiles = [f for f in listdir(directory)
+                     if isfile(join(directory, f))]
+        # print onlyfiles
+        for f in onlyfiles:
+            if f.endswith(".asim"):
+                # print f
+                # simN = f[:f.find('.')]
+                # print simN
+                list_asim.append(f)
+    return list_asim
+
+
 def findChartName(directory):
     onlyfiles = [f for f in listdir(directory)
                  if isfile(join(directory, f))]
@@ -515,6 +643,8 @@ def findChartName(directory):
             # print f
             chartN = f[:f.find('.')]
             # print chartN
+        # else:
+        #     chartN = ""
     for f in onlyfiles:
         if f.endswith(".asim"):
             # print f
@@ -533,7 +663,7 @@ def findTxtFileName(folders, x):
 
 
 def findFreq(folders, model, projMan, mvtcolumn):
-    stim = model.getElementByType("ExternalStimuli")
+    stim = model.getElementByType("readAnimatLabSimDir")
     stimName = stim[0].find("Name").text
     initval = float(stim[0].find("CurrentOn").text)
     simSet = SimulationSet.SimulationSet()
@@ -866,7 +996,7 @@ def savechartfile(name, directory, chart, comment):
     if chart != []:
         chartname = name + txtnumber + ".txt"
         txt = chartname + "; " + comment
-        # print "saving charttxt  file... " + name + "{}.txt".format(txtnumber)
+        print "saving charttxt  file... " + name + "{}.txt".format(txtnumber)
         f = open(destfilename, 'w')
         f.write(str(txt + '\n'))
         for i in range(len(chart)):
@@ -874,6 +1004,8 @@ def savechartfile(name, directory, chart, comment):
                 f.write(str(chart[i][j]) + '\t')
             f.write(str(chart[i][j+1]) + '\n')
         f.close()
+    else:
+        print "no chart"
     return chartname
 
 
@@ -934,6 +1066,12 @@ def writeBestValuesTab(folders, ficname, tab_var, params, trial,
                        chartfilename, bestfit):
     filename = folders.animatlab_result_dir + ficname
     f = open(filename, 'a')
+
+    now = datetime.datetime.now()
+    s = now.strftime("%Y-%m-%d %H:%M:%S")
+    s = s + '  ' + '\n'
+    f.write(s)
+
     s = 'trial:' + str(trial) + '\t' + 'chartfile name:' + '\t' \
         + chartfilename + '\t' + '    bestfit:' + '\t' + str(bestfit) + '\n'
     f.write(s)
@@ -953,7 +1091,6 @@ def writeBestValuesTab(folders, ficname, tab_var, params, trial,
 
 
 def writeBestResSuite(folders, ficname, bestresults, titre):
-    s = ""
     nblines = 0
     write = False
     filename = folders.animatlab_result_dir + ficname
@@ -974,6 +1111,7 @@ def writeBestResSuite(folders, ficname, bestresults, titre):
         if nblines == 1:
             write = True
     if write:
+        s = ""
         f = open(filename, 'a')
         for i in range(len(bestresults)-1):
             s = s + str(bestresults[i]) + '\t'
@@ -1219,7 +1357,8 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
 
 
 def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
-                      ExternalStimuli, tab_stims, listeNeurons, listeNeuronsFR,
+                      readAnimatLabSimDir, tab_stims, listeNeurons,
+                      listeNeuronsFR,
                       mvtcolumn, mnCol, rate, lineStart, lineEnd,
                       rang, step, trial, epoch,
                       deltaStim, maxDeltaStim, limits, limQuality,
@@ -1238,15 +1377,15 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
             value_plus = maxStim
         if value_base != 0:  # if parameter value was set to 0 in original asim
             if value_minus == 0:    # then don't change it. But if not then
-                value_minus == 1e-11    # to avoid being trapped, set it to  
+                value_minus == 1e-11    # to avoid being trapped, set it to
             if value_plus == 0:         # non zero value
                 value_plus == 1e-11
-            
+
     if paramName == 'StartTime' or paramName == 'EndTime':
         if value_minus < 0:
             value_minus = 0
         if paramName == 'EndTime':
-            start_time = float(ExternalStimuli[stimRank]
+            start_time = float(readAnimatLabSimDir[stimRank]
                                .find('StartTime').text)
             end_time = value_minus
             if end_time < start_time:
@@ -1254,7 +1393,7 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
                 value_minus = end_time
         if paramName == 'StartTime':
             start_time = value_plus
-            end_time = float(ExternalStimuli[stimRank].find('EndTime').text)
+            end_time = float(readAnimatLabSimDir[stimRank].find('EndTime').text)
             if end_time < start_time:
                 start_time = end_time - 0.01
                 value_plus = start_time
@@ -1281,7 +1420,8 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
 
 
 def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
-                     ExternalStimuli, tab_stims, listeNeurons, listeNeuronsFR,
+                     readAnimatLabSimDir, tab_stims, listeNeurons,
+                     listeNeuronsFR,
                      mvtcolumn, mnCol, rate, lineStart, lineEnd,
                      rang, trial, epoch,
                      deltaStim, maxDeltaStim, limits, limQuality,
@@ -1297,7 +1437,7 @@ def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
     while step < nbsteps:
         result = runThreeStimTests(folders, model, projMan, simSet,
                                    stimRank, paramName,
-                                   ExternalStimuli, tab_stims,
+                                   readAnimatLabSimDir, tab_stims,
                                    listeNeurons, listeNeuronsFR,
                                    mvtcolumn, mnCol, rate, lineStart, lineEnd,
                                    rang, step, trial, epoch,
@@ -2015,15 +2155,6 @@ def improveStims(folders, model, projMan, allPhasesStim,
         print "no 'External stimulus' detected"
 
 
-def enableStims(ExternalStimuli, stims):
-    nbStims = len(ExternalStimuli)
-    for stim in range(nbStims):
-        ExternalStimuli[stim].find("Enabled").text = 'False'
-    for stim in range(len(stims)):
-        stimRank = stims[stim]
-        ExternalStimuli[stimRank].find("Enabled").text = 'True'
-
-
 ###########################################################################
 #                           CMAe procedures
 ###########################################################################
@@ -2032,31 +2163,41 @@ def enableStims(ExternalStimuli, stims):
 #                           Marquez procedures
 ###########################################################################
 
-def writeWeightTab(folders, weightMarquez, nbruns,
-                   chartColNames, mnCol, sensCol):
+def writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, nbruns,
+                          chartColNames, mnCol, sensCol):
     filename = folders.animatlab_result_dir + "weightMarquez.txt"
     f = open(filename, 'a')
-    s = ''
-    for i in range(len(mnCol)):
-        s = s + chartColNames[mnCol[i]] + '\t'
-        for j in range(len(sensCol)-1):
-            s = s + '   ' + '\t'
+    now = datetime.datetime.now()
+    s = now.strftime("%Y-%m-%d %H:%M:%S")
     s = s + '  ' + '\n'
     f.write(s)
-    s = ''
-    for i in range(len(mnCol)):
-        for j in range(len(sensCol)):
-            s = s + chartColNames[sensCol[j]] + '\t'
-    s = s + '\n'
-    f.write(s)
-    s = ''
-    for t in range(nbruns):
+
+    for amp in range(len(twitchAmpSet)):
+        s = ''
+        for i in range(len(mnCol)):
+            s = s + chartColNames[mnCol[i]] +\
+                '\t' + str(twitchAmpSet[amp]) + '\t'
+            for j in range(len(sensCol)-2):
+                s = s + '   ' + '\t'
+        s = s + '  ' + '\n'
+        f.write(s)
+        s = ''
         for i in range(len(mnCol)):
             for j in range(len(sensCol)):
-                s = s + str(weightMarquez[i][j][t]) + '\t'
+                s = s + chartColNames[sensCol[j]] + '\t'
         s = s + '\n'
         f.write(s)
         s = ''
+        for t in range(nbruns):
+            for i in range(len(mnCol)):
+                for j in range(len(sensCol)):
+                    s = s + str(weightMarquez[amp][i][j][t]) + '\t'
+            s = s + '\n'
+            f.write(s)
+            s = ''
+        s = '\n'
+        f.write(s)
+
     f.write('\n')
     f.close()
 
@@ -2070,6 +2211,34 @@ def copyFile(filename, src, dst):
     sourcefile = src + filename
     destfile = dst + filename
     shutil.copy(sourcefile, destfile)
+
+
+def enableStims(ExternalStimuli, stims):
+    nbStims = len(ExternalStimuli)
+    for stim in range(nbStims):
+        ExternalStimuli[stim].find("Enabled").text = 'False'
+    for stim in range(len(stims)):
+        stimRank = stims[stim]
+        ExternalStimuli[stimRank].find("Enabled").text = 'True'
+
+
+def setMotorStimsOff(model, motorStimuli):
+    """
+    sets motors stimulis to "disabled"
+    """
+    for i in range(len(motorStimuli)):
+        motorEl = motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            nomMoteur = elem.find("Name").text
+            print nomMoteur,
+            space = ""
+            for sp in range(3-len(nomMoteur)/8):
+                space += "\t"
+            print space + "set from  ",
+            print elem.find("Enabled").text,
+            elem.find("Enabled").text = "False"
+            print "   to   ", elem.find("Enabled").text
+    affichMotor(model, motorStimuli, 1)
 
 
 def setPlaybackControlMode(model, mode):
@@ -2103,7 +2272,7 @@ def setGravity(model, gravity):
     pathE = "Environment"
     oldGravity = asimroot.find(pathE).find("Gravity").text
     asimroot.find(pathE).find("Gravity").text = str(gravity)
-    # enableStims(twitStMusclesSt)
+    # enableStims(ExternalStimuli, twitStMusclesSt)
     # After changing a property, save the updated model
     model.saveXML(overwrite=True)   # in the FinalModel dir
     print "Gravity has been changed from", oldGravity, "to", gravity
@@ -2113,30 +2282,65 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
                nbruns, mnCol, sensCol, chart_col, chartColNames,
                twitStMusclesSt, startTwitch, endTwitch, chartStart, rate,
                eta, timeMes, delay):
-    # global tab_connexions, tab_stims, corr, table
+
+    """
+    This procedure is inspire from (Marquez et al, PLOS ComputBiol 2014)
+    It controls ExternalStimulis to keep only stimuli on MNs
+    It produces brief stimuli (100 ms) in those MNs (Uo to 4 intensities are
+    used: 50nA, 20nA, 10nA and 5 nA)
+    The produced movements activate sensory neurons
+    The procedure calculate the otpimal gain between sensory neurons and each
+    MN using a anti-Oja rule (Marquez et al, Biol Cybern, 2013)
+
+    Practically the original asim file present in "FinalModel" is copied in a
+    temp directory (to allow restoration after the Marquez procedure).
+    Then each stimuli amplitude is applied to each MN sequentially
+    (indeed in separate trials). The results of these stimuli are stored in
+    chart files (whose content was defined in Animatlab) in the
+    "ChartTwitchFiles" directory, and tables containing     the MN and sensory
+    activities are stored in a table in memory (tableTmp). This table is used
+    for applying the anti-Oja rule in a recursive way, using a fixed number of
+    steps (nbruns).
+    The result is a table of the evolution of synaptic weights between sensory
+    neurons (sj) and motor neurons (mi). This table is saved in the
+    "ResultFiles" directory under the name "weightMarquez.txt". If new runs
+    of Marquez procedure are made, the results are added in this file.
+
+    """
     global weightMarquez
     lineStartTwitch = int((startTwitch-chartStart)*rate) + 1
     lineEndTwitch = int((startTwitch + timeMes + delay - chartStart)*rate) + 2
-    stop = 0
+
     corr_sensName = ['', '', '']  # starts with two empty columns
     corr = []
-    weightMarquez = [[[0]]]
-    for i in range(len(twitStMusclesSt)-1):
-        weightMarquez.append([[0]])
-    for i in range(len(twitStMusclesSt)):
-        for j in range(len(sensCol)-1):
-            weightMarquez[i].append([0])
-    mi = []
-    for i in range(len(twitStMusclesSt)):
-        mi.append(0)
+    twitchAmpSet = [5.0000e-08, 2.0000e-08, 1.0000e-08, 5.0000e-09]
+    # twitchAmpSet = [5.0000e-09]
+    weightMarquez = [[[[0]]]]
+    for amp in range(len(twitchAmpSet)-1):
+        weightMarquez.append([[[0]]])
+    for amp in range(len(twitchAmpSet)):
+        for i in range(len(twitStMusclesSt)-1):
+            weightMarquez[amp].append([[0]])
+    for amp in range(len(twitchAmpSet)):
+        for i in range(len(twitStMusclesSt)):
+            for j in range(len(sensCol)-1):
+                weightMarquez[amp][i].append([0])
 
+    mi = []
+    tmp = []
+    for amp in range(len(twitchAmpSet)):
+        for i in range(len(twitStMusclesSt)):
+            tmp.append(0)
+        mi.append(tmp)
+        tmp = []
     # Preparation of the first line of the corr table with sensory neuron names
     for i in range(len(sensCol)):
         corr_sensName.append(chartColNames[sensCol[i]])
     # print corr_sensName
     corr.append(corr_sensName)
 
-    print "\ncopying original asim File to Temp Directory"
+    print "\n"
+    print "copying asim File to Temp Directory"
     simFileName = findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
     sourceDir = folders.animatlab_commonFiles_dir
     destDir = folders.animatlab_rootFolder + "temp/"
@@ -2146,105 +2350,109 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
     # seriesStimParam = ["CurrentOn", "StartTime", "EndTime"]
 
     # Ensures that asim environment is OK
-    setGravity(model, 0)
+    # setGravity(model, 0)
     setPlaybackControlMode(model, 0)  # 0: fastestPossible; 1: match physics
-    enableStims(twitStMusclesSt)
+    # enableStims(ExternalStimuli, twitStMusclesSt)
 
     print "PREPARING asim File for twitches"
     # initSimulation()
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet object
-    for t in range(nbruns):
-        for ii in range(len(twitStMusclesSt)):
-            for i in range(len(tab_stims)):  # set all external stimuli to zero
-                ExternalStimuli[i].find("CurrentOn").text = '0'
-                ExternalStimuli[i].find("Enabled").text = 'False'
-            stimName = [tab_stims[twitStMusclesSt[0]][0],
-                        tab_stims[twitStMusclesSt[1]][0]]
 
-            print ""
-            print 'twit=', ii
-            corr_mn = []
-            # simSet.samplePts = []
-            stimRank = twitStMusclesSt[ii]
-            # print stimRank
-            ExternalStimuli[stimRank].find("Enabled").text = 'True'
-            ExternalStimuli[stimRank].find("StartTime").text = str(startTwitch)
-            ExternalStimuli[stimRank].find("EndTime").text = str(endTwitch)
-            tab_stims = affichExtStim(ExternalStimuli, 1)  # 0 -> no print
-            model.saveXML(overwrite=True)
-            # twitchAmpSet = [5.0000e-08, 2.0000e-08, 1.0000e-08, 5.0000e-09]
-            twitchAmpSet = [50.0000e-09]
-            simSet.samplePts = []
-            simSet.set_by_range({stimName[ii] + ".CurrentOn": twitchAmpSet})
-            print simSet.samplePts
-            projMan.make_asims(simSet)
-            projMan.run(cores=-1)
-            for amp in range(len(twitchAmpSet)):
-                print amp
+    for i in range(len(tab_stims)):  # set all external stimuli to zero
+        ExternalStimuli[i].find("CurrentOn").text = '0'
+        ExternalStimuli[i].find("Enabled").text = 'False'
+    stimName = [tab_stims[twitStMusclesSt[0]][0],
+                tab_stims[twitStMusclesSt[1]][0]]
+
+    tableTmp = []
+    k = 0
+    for ii in range(len(twitStMusclesSt)):
+        print ""
+        print 'twit=', ii
+        corr_mn = []
+        stimRank = twitStMusclesSt[ii]
+        # print stimRank
+        ExternalStimuli[stimRank].find("Enabled").text = 'True'
+        ExternalStimuli[stimRank].find("StartTime").text = str(startTwitch)
+        ExternalStimuli[stimRank].find("EndTime").text = str(endTwitch)
+        tab_stims = affichExtStim(ExternalStimuli, 1)  # 0 -> no print
+        model.saveXML(overwrite=True)
+        simSet.samplePts = []
+        simSet.set_by_range({stimName[ii] + ".CurrentOn": twitchAmpSet})
+        print simSet.samplePts
+        projMan.make_asims(simSet)
+        projMan.run(cores=-1)
+        ExternalStimuli[stimRank].find("Enabled").text = 'False'
+        for amp in range(len(twitchAmpSet)):
+            twitchdir = folders.animatlab_rootFolder + "ChartTwitchFiles/"
+            tableTmp.append(tablo(folders, findTxtFileName(folders, amp+1)))
+            stimtxt = '%2.2f' % (twitchAmpSet[amp] * 1e09)
+            comment = '\t' + stimName[ii] + ' ' + stimtxt + 'nA' + ' ' + str(k)
+            savechartfile("twitchchart", twitchdir, tableTmp[k], comment)
+            k += 1
+
+        print "\nsaving twitch asim File to FinalTwitchModel Directory"
+        sourceDir = folders.animatlab_simFiles_dir
+        destDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+        if not os.path.exists(destDir):
+            os.makedirs(destDir)
+        simTwitchFileNames = findList_asimFiles(sourceDir)
+        for asimFileName in simTwitchFileNames:
+            copyFile(asimFileName, sourceDir, destDir+stimName[ii])
+
+    for amp in range(len(twitchAmpSet)):
+        print
+        print 'twitchAmp: ', twitchAmpSet[amp]
+        for t in range(nbruns):
+            for ii in range(len(twitStMusclesSt)):
                 if t == 0:
                     corr_mn.append([twitchAmpSet[amp]])
                     corr_mn.append(chartColNames[mnCol[ii]])
-                twitchdir = folders.animatlab_rootFolder + "ChartTwitchFiles/"
-                tableTmp = tablo(folders, findTxtFileName(folders, amp+1))
-                stimtxt = '%2.2f' % (twitchAmpSet[0] * 1e09)
-                comment = '\t' + stimName[ii] + ' ' + stimtxt + 'nA'
-                chartname = savechartfile("twitchchart", twitchdir,
-                                          tableTmp, comment)
-                print "... chart file {} saved".format(chartname)
                 for j in range(len(sensCol)):
                     # miprec = mi[ii]
-                    mitempTab = extract(tableTmp, mnCol[ii],
-                                        lineStartTwitch, lineEndTwitch)
-                    mi[ii] = mitempTab[int(timeMes * rate)] - mitempTab[0]
-                    sitempTab = extract(tableTmp, sensCol[j],
-                                        lineStartTwitch, lineEndTwitch)
+                    mitempTab = extract(tableTmp[amp + ii*len(twitchAmpSet)],
+                                        mnCol[ii],
+                                        lineStartTwitch,
+                                        lineEndTwitch)
+                    mi[amp][ii] = mitempTab[int(timeMes * rate)] - mitempTab[0]
+                    sitempTab = extract(tableTmp[amp + ii*len(twitchAmpSet)],
+                                        sensCol[j],
+                                        lineStartTwitch,
+                                        lineEndTwitch)
                     sitempPrimTab = derive(sitempTab)
                     siprim = sitempPrimTab[int((timeMes + delay)*rate)-2] \
                         - sitempPrimTab[0]
-                    deltaWeight = calcDeltaWeight(eta, mi[ii],
+                    deltaweight = calcDeltaWeight(eta, mi[amp][ii],
                                                   siprim,
-                                                  weightMarquez[ii][j][t])
-                    if deltaWeight == 0:
+                                                  weightMarquez[amp][ii][j][t])
+                    if deltaweight == 0:
                         print "ii= {}; j= {}; siprim ={}".format(ii, j, siprim)
-                    nextWeight = weightMarquez[ii][j][t] + deltaWeight
-                    weightMarquez[ii][j].append(nextWeight)
-                    txt = "t: %2d; mi[%2d] = %.4e; \tdeltaWeight = %.4e"
-                    txt = txt + "\tweight[%2d]=%.4e; \tweight[%2d]=%2.4e"
-                    print txt % (t, ii, mi[ii], deltaWeight,
-                                 t, weightMarquez[ii][j][t],
-                                 t+1, weightMarquez[ii][j][t+1])
+                    nextweight = weightMarquez[amp][ii][j][t] + deltaweight
+                    weightMarquez[amp][ii][j].append(nextweight)
+                    txt = "t: %2d; mi[%2d] = %.4e; \tdeltaweight = %.4e"
+                    txt = txt + "\tweightMarquez[%2d]=%.5e;"
+                    txt = txt + "\t   weightMarquez[%2d]=%2.4e"
+                    if j == 0:
+                        print txt % (t, ii, mi[amp][ii], deltaweight,
+                                     t, weightMarquez[amp][ii][j][t],
+                                     t+1, weightMarquez[amp][ii][j][t+1])
                     # print weightMarquez
-                    corrcoeff = correl(tableTmp, mnCol[ii], sensCol[j],
+                    corrcoeff = correl(tableTmp[amp + ii*len(twitchAmpSet)],
+                                       mnCol[ii], sensCol[j],
                                        lineStartTwitch, lineEndTwitch)
                     if t == 0:
-                        corr_mn.append(corrcoeff)
+                        corr_mn.append('{:02.6f}'.format(corrcoeff))
                         # print "corr coeff =", corrcoeff
-                if stop:
-                    break
                 if t == 0:
                     corr.append(corr_mn)
                     corr_mn = []
-            if stop:
-                break
-            ExternalStimuli[stimRank].find("Enabled").text = 'False'
-        if stop:
-            break
+
     print ''
     affich_table(corr)
-    writeWeightTab(folders, weightMarquez, nbruns,
-                   chartColNames, mnCol, sensCol)
-    print "\nsaving twitch asim File to FinalTwitchModel Directory"
-    sourceDir = folders.animatlab_commonFiles_dir
-    destDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
-    if not os.path.exists(destDir):
-        os.makedirs(destDir)
-    copyFile(simFileName, sourceDir, destDir)
+    writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, nbruns,
+                          chartColNames, mnCol, sensCol)
 
     print "\ncopying original asim File back to FinalModel Directory"
     sourceDir = folders.animatlab_rootFolder + "temp/"
     destDir = folders.animatlab_commonFiles_dir
     copyFile(simFileName, sourceDir, destDir)
-
-    # Set Gravity to 9.81 in asim file environment
-    setGravity(model, 9.81)
-    enableStims(twitStMusclesSt)

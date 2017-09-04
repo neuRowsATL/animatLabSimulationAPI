@@ -3,6 +3,8 @@ Created by:     Bryce Chung (neuRowsATL)
 Last Modified:  May 20, 2016 (version 3)
 
 Description: This class opens and saves AnimatLab models from .aproj files.
+Modified August 23 2017 Daniel Cattaert
+    ActualizeAproj now include StartTime and EndTime of externalStimuli
 """
 
 # Import dependencies
@@ -220,7 +222,7 @@ class AnimatLabModel(object):
         """
         # modified by Daniel Cattaert May 2016
         in order to allow this module to work when a second organism is added
-        the three lines above have been replaced in the three next lines by
+        the three lines above have been replaced in the three next lines
         """
 
         path = "Environment/Organisms"
@@ -314,8 +316,7 @@ class AnimatLabModel(object):
         self.lookup["ID"] = lookupID
         self.lookup["Name"] = lookupName
         self.lookup["Element"] = lookupElement
-
-
+        #
 
         # ===============================================
         # Set up lookup table for aproj model elements
@@ -424,7 +425,7 @@ class AnimatLabModel(object):
                     elif cn.split('.')[-1] == "PhysicalToNodeAdapter":
                         # print el.find("Text").text,
                         aprojlookupAppendNode(el, "Adapters")
-       #  print
+        # print
 
         # print "Symapses types"
         path = "Simulation/Environment/Organisms"
@@ -739,6 +740,55 @@ class AnimatLabModel(object):
         # self.tree = elementTree.parse(self.asimFile)    # return to asimfile
         # root = self.tree.getroot()
 
+    def asimtoaproj(self, el, ptVar, pts, simpar):
+        # reads Animatlab Aproj file param value and scale
+        va = el.get("Value")
+        sc = el.get("Scale")
+        ac = el.get("Actual")
+        if simpar == "Value":
+            txt1 = str(ptVar)
+            for k in range(4-(len(txt1)/8)):
+                txt1 += "\t"
+            txt2 = "= " + str(va)
+            for k in range(2-(len(txt2)/8)):
+                txt2 += "\t"
+            print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            # Update the AnimatLab element value
+            newValue = pts[ptVar]
+            if sc == 'nano':
+                newActual = newValue * 1e-09
+            elif sc == 'micro':
+                newActual = newValue * 1e-06
+            elif sc == 'milli':
+                newActual = newValue * 1e-03
+            elif sc == 'None':
+                newActual = newValue
+        else:
+            txt1 = str(ptVar)
+            for k in range(4-(len(txt1)/8)):
+                txt1 += "\t"
+            txt2 = "= " + str(ac)
+            for k in range(2-(len(txt2)/8)):
+                txt2 += "\t"
+            print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            # Update the AnimatLab element value
+            newActual = pts[ptVar]
+            if sc == 'nano':
+                newValue = newActual / 1e-09
+            elif sc == 'micro':
+                newValue = newActual / 1e-06
+            elif sc == 'milli':
+                newValue = newActual / 1e-03
+            elif sc == 'None':
+                newValue = newActual
+            el.set("Value", str(newValue))
+            el.set("Scale", sc)
+            el.set("Actual", str(newActual))
+
+        el.set("Value", str(newValue))
+        el.set("Scale", sc)
+        el.set("Actual", str(newActual))
+
     def actualizeAproj(self, obj_simSet, aprojSaveDir):
         for ix, pts in enumerate(obj_simSet.samplePts):
             print ix, pts
@@ -750,72 +800,21 @@ class AnimatLabModel(object):
                 if param == 'G':
                     # ATTENTION!!! Animatlab simfile indique G = Value
                     el = node.find('SynapticConductance')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, va, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, va, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, va, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newValue = pts[ptVar]
-                    if sc == 'nano':
-                        newActual = newValue * 1e-09
-                    elif sc == 'micro':
-                        newActual = newValue * 1e-06
-                    elif sc == 'milli':
-                        newActual = newValue * 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
-                if param == "Weight":
+                    self.asimtoaproj(el, ptVar, pts, "Value")
+                elif param == "Weight":
                     # ATTENTION!!! Animatlab simfile indique Weight = Actual
                     el = node.find('Weight')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, ac, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, ac, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, ac, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newActual = pts[ptVar]
-                    if sc == 'nano':
-                        newValue = newActual / 1e-09
-                    elif sc == 'micro':
-                        newValue = newActual / 1e-06
-                    elif sc == 'milli':
-                        newValue = newActual / 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
+                    self.asimtoaproj(el, ptVar, pts, "Actual")
                 elif param == 'CurrentOn':
                     # ATTENTION!!! Animatlab simfile indique CurrentOn = Actual
                     el = node.find('CurrentOn')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, ac, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, ac, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, ac, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newActual = pts[ptVar]
-                    if sc == 'nano':
-                        newValue = newActual / 1e-09
-                    elif sc == 'micro':
-                        newValue = newActual / 1e-06
-                    elif sc == 'milli':
-                        newValue = newActual / 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
+                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                elif param == 'StartTime':
+                    el = node.find('StartTime')
+                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                elif param == 'EndTime':
+                    el = node.find('EndTime')
+                    self.asimtoaproj(el, ptVar, pts, "Actual")
 
     def actualizeAprojStimState(self, asimtab_stims, aprojSaveDir):
             for extStim in range(len(asimtab_stims)):
@@ -826,7 +825,15 @@ class AnimatLabModel(object):
                 node = self.getElementByNameAproj(name)
                 el = node.find('Enabled').text
                 node.find('Enabled').text = str(state)
-                print name, "\t", el, "--->", "\t", state
+
+                txt1 = str(name)
+                for k in range(3-(len(txt1)/8)):
+                    txt1 += "\t"
+                txt2 = str(el) + " ---> "
+                for k in range(2-(len(txt2)/8)):
+                    txt2 += "\t"
+                print txt1 + txt2 + str(state)
+                # print name, "\t", el, "--->", "\t", state
 
     def saveXMLaproj(self, fileName='', overwrite=False):
         """
