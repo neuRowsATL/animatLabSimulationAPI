@@ -207,10 +207,84 @@ class AnimatLabModel(object):
             lookupName.append(sname + "*" + tname)
             lookupElement.append(el)
 
+        ######################################################################
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        def analyzeChilbodies(rb, level):
+            txt = ""
+            rbfound = 0
+            chrblist = []
+            for n in range(level):
+                txt += "\t"
+            # print txt, level, rb, rb.find("Name").text
+            el = rb.find("Joint")
+            if el is not None:
+                print txt + el.find("Name").text
+                lookupAppend(el, "Joint")
+            elt = rb.find("ChildBodies")
+            if elt is not None:
+                rbfound = 1
+                chrblist = list(elt)
+            # if rbfound == 0:
+            #     print txt + "No childbodies"
+            # if rbfound == 1:
+            #     print txt + "childbodies found",
+            #     print txt, level, chrblist
+            return [rbfound, chrblist]
+
         print "\nREADING .asim elements..."
 
-        # for el in root.find("ExternalStimuli").getchildren():
-        #    lookupAppend(el, "ExternalStimuli")
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        level = 0
+        rbfound = 0
+        subfound = 0
+        childRbNb = 0
+        nbsub = 1  # the firt list of rigid bodies
+        subchrblist = []
+        path = "Environment/Organisms"
+        organisms = list(root.find(path))
+        for organism in organisms:
+            for rigidbodyelmt in list(organism.find("RigidBody")):
+                # print rigidbodyelmt
+                if list(rigidbodyelmt) != []:
+                    # print list(rigidbodyelmt)
+                    subfound = 1
+                    rbeltlist = list(rigidbodyelmt)
+                    subchrblist.append(rbeltlist)
+                    childRbNb = 0
+                    # number of child RigidBodies
+
+                    while subfound:
+                        for ch in range(nbsub):
+                            childRbNb = 0
+                            subfound = 0  # flag to indicate a child rb exists
+                            # first looks for all childbodies from same parent
+                            for rb in subchrblist[level+ch]:
+                                [rbfound, chrblist] = analyzeChilbodies(rb,
+                                                                        level)
+                                if rbfound:
+                                    childRbNb += 1
+                                    subfound = 1
+                                    # each time childbodies are found, the list
+                                    # is added to the subchrblist
+                                    subchrblist.append(chrblist)
+                                nbsub = childRbNb
+                                # ... continues the analysis of the parent
+                            if subfound:    # once the parent has been scaned,
+                                level += 1  # and childbodies found, each child
+                                # becomes parent: the process starts again
+        ######################################################################
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorPosition":
+                lookupAppend(el, "MotorPosition")
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorVelocity":
+                lookupAppend(el, "MotorVelocity")
 
         for el in list(root.find("ExternalStimuli")):
             if el.find("Type").text == "Current":
@@ -278,10 +352,19 @@ class AnimatLabModel(object):
         for el in list(root.find("DataCharts")):
             lookupAppend(el, "Chart")
 
+        """
         path = "DataCharts/DataChart/DataColumns"
         modules = list(root.find(path))
         for el in modules:
-                lookupAppend3(el, "ChartcolName")
+            lookupAppend3(el, "ChartcolName")
+        """
+        ch = 0
+        for module in list(root.find("DataCharts")):
+            print module.find("Name").text
+            for el in list(module.find("DataColumns")):
+                typ = "ChartCol" + str(ch)
+                lookupAppend3(el, typ)
+            ch += 1
 
         path = "Environment/Organisms"
         organisms = list(root.find(path))
@@ -789,7 +872,7 @@ class AnimatLabModel(object):
         el.set("Scale", sc)
         el.set("Actual", str(newActual))
 
-    def actualizeAproj(self, obj_simSet, aprojSaveDir):
+    def actualizeAproj(self, obj_simSet):
         for ix, pts in enumerate(obj_simSet.samplePts):
             print ix, pts
             for ptVar in pts:
@@ -816,7 +899,7 @@ class AnimatLabModel(object):
                     el = node.find('EndTime')
                     self.asimtoaproj(el, ptVar, pts, "Actual")
 
-    def actualizeAprojStimState(self, asimtab_stims, aprojSaveDir):
+    def actualizeAprojStimState(self, asimtab_stims):
             for extStim in range(len(asimtab_stims)):
                 # Find the AnimatLab element by name
                 name = asimtab_stims[extStim][0]
@@ -1014,10 +1097,20 @@ class AnimatLabSimFile(object):
         for el in list(root.find("DataCharts")):
             lookupAppend(el, "Chart")
 
+        """
         path = "DataCharts/DataChart/DataColumns"
         modules = list(root.find(path))
         for el in modules:
-                lookupAppend3(el, "ChartcolName")
+            lookupAppend3(el, "ChartcolName")
+        """
+
+        ch = 0
+        for module in list(root.find("DataCharts")):
+            print module.find("Name").text
+            for el in list(module.find("DataColumns")):
+                typ = "ChartCol" + str(ch)
+                lookupAppend3(el, typ)
+            ch += 1
 
         path = "Environment/Organisms"
         organisms = list(root.find(path))
