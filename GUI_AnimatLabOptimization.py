@@ -11,7 +11,7 @@ when parameters have been selected and set, saves a "paramOpt.pkl" file in the
  "resultFile directory" of the animaltLab model directory
  and writes the path of the animatLab model to the working directory
 
-Modified June 7 2017
+Modified June 7 2017 (D. Cattaert)
     in Procedure "getValuesFromPannel":
     valstr.encode('ascii', 'ignore') replaces valstr (to get rid of the 'u')
 
@@ -19,17 +19,17 @@ Modified June 7 2017
     doublet values and names are now avoided in exConn, exConnFR and exStim
     and in self.optSet.disabledSynNames, self.optSet.disabledSynFRNames and
     self.optSet.disabledStimNames
-Modified June 8 2017
+Modified June 8 2017 (D. Cattaert)
     added a nex checkbox column in chart for mvt
-Modified June 29,2017
+Modified June 29,2017 (D. Cattaert)
     This GUI soft is now upgraded to work with PyQt5
-Modified July 17, 2017
+Modified July 17, 2017 (D. Cattaert)
     def browse_folder(self):(line 575): function modified to extract both
     rootname and subdir from readAnimatLabSimDir() (a function that reads the
     path to the previous animatlab simulation visited. The name of the file is
     "animatlabSimDir.txt" that is stored in the AnimatLabSimulationAPI folder)
     This function has been added line 75
-modified July 17,2017
+modified July 17,2017 (D. Cattaert)
     lines 441: added some commands to avoid a problem with a procedure called
     animatlabOptimSetting  (self.optSet.actualizeparamMarquez)
         self.optSet.mnColChartNbs = self.optSet.paramMarquez['mnColChartNbs']
@@ -38,11 +38,11 @@ modified July 17,2017
             self.optSet.mnColChartNames.append(self.optSet.chartColNames[i])
         print self.optSet.mnColChartNames
     now the list of mnColChartNames is actualized.
-modified August 18 2017
+modified August 18 2017 (D. Cattaert)
     self.optSet is now defined as self.optSet in class ReadAsimAform
 modified August 22 2017
     procedure to choose twitStMusclesStNbs is now implemented
-Modified August 28,2017:
+Modified August 28,2017 (D. Cattaert):
     new procedure lines 1306-1314. Two new functions crearted :
         readAnimatLabV2ProgDir() and saveAnimatLabV2ProgDir()
      animatLabV2ProgDir = readAnimatLabV2ProgDir()
@@ -58,6 +58,7 @@ Modified August 28,2017:
     to ask for path of the AnimatLabV2 program directory. This path is saved in
     a text file named:"readAnimatLabV2ProgDir.txt" in the working directory.
     If this file exists then the path is red and is no more asked for.
+
 @author: cattaert
 """
 
@@ -127,6 +128,16 @@ def readAnimatLabSimDir():
         directory = ""
     # print "First instance: Root directory will be created from GUI"
     return directory
+
+
+def chooseChart(optSet):
+    dicItems = {"selectedChart": optSet.chartName[0]}
+    rep = GetList.listTransmit(parent=None,
+                               listChoix=["selectedChart"],
+                               items=optSet.chartName,
+                               dicItems=dicItems,
+                               titleText="Choose the chart for measurements")
+    return rep
 
 
 class GetList(QDialog):
@@ -334,9 +345,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.animatLabV2ProgDir = None
 
     def loadParams(self, paramFicName, listparNameOpt):
-        """
-        doc string
-        """
         try:
             print "looking paramOpt file:", paramFicName
             with open(paramFicName, 'rb') as input:
@@ -348,9 +356,10 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                 self.optSet.paramMarquezValue = pickle.load(input)
                 self.optSet.paramMarquezType = pickle.load(input)
                 self.optSet.paramMarquezCoul = pickle.load(input)
-            print "nb loded param :", len(self.optSet.paramLoebName)
+            print "nb loaded param :", len(self.optSet.paramLoebName)
             print "nb actual param:", len(listparNameOpt)
-            if len(self.optSet.paramLoebName) == len(listparNameOpt):
+            nbloadedpar = len(self.optSet.paramLoebName)
+            if nbloadedpar == 42:
                 print "paramOpt :"
                 self.optSet.printParams(self.optSet.paramLoebName,
                                         self.optSet.paramLoebValue)
@@ -358,6 +367,23 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                 self.optSet.printParams(self.optSet.paramMarquezName,
                                         self.optSet.paramMarquezValue)
                 print '====  Param loaded  ===='
+                response = True
+            elif nbloadedpar == 41:
+                print "paramOpt with only 41 params: => actualization..."
+                pln = ['selectedChart'] + self.optSet.paramLoebName
+                self.optSet.paramLoebName = pln
+                plv = [0] + self.optSet.paramLoebValue
+                self.optSet.paramLoebValue = plv
+                plt = [int] + self.optSet.paramLoebType
+                self.optSet.paramLoebType = plt
+                plc = ["Magenta"] + self.optSet.paramLoebCoul
+                self.optSet.paramLoebCoul = plc
+                self.optSet.printParams(self.optSet.paramLoebName,
+                                        self.optSet.paramLoebValue)
+                print "paramMarquez :"
+                self.optSet.printParams(self.optSet.paramMarquezName,
+                                        self.optSet.paramMarquezValue)
+                print '===================  Param loaded  ===================='
                 response = True
             else:
                 print "Mismatch between existing and actual parameter files"
@@ -436,8 +462,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeStimNbs']))
         itm2 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['disabledStimNbs']))
-        self.tableWidget_7.setItem(13, 1, itm1)
-        self.tableWidget_7.setItem(12, 1, itm2)
+        self.tableWidget_7.setItem(14, 1, itm1)
+        self.tableWidget_7.setItem(13, 1, itm2)
 
     def connex_cell_was_clicked(self, row, column):
         """
@@ -455,8 +481,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynNbs']))
         itm2 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['disabledSynNbs']))
-        self.tableWidget_7.setItem(17, 1, itm1)
-        self.tableWidget_7.setItem(16, 1, itm2)
+        self.tableWidget_7.setItem(18, 1, itm1)
+        self.tableWidget_7.setItem(17, 1, itm2)
 
     def connexFR_cell_was_clicked(self, row, column):
         """
@@ -475,8 +501,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynFRNbs']))
         itm2 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['disabledSynFRNbs']))
-        self.tableWidget_7.setItem(19, 1, itm1)
-        self.tableWidget_7.setItem(18, 1, itm2)
+        self.tableWidget_7.setItem(20, 1, itm1)
+        self.tableWidget_7.setItem(19, 1, itm2)
 
     def neuron_cell_was_clicked(self, row, column):
         """
@@ -546,7 +572,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['mvtcolumn']))
         self.tableWidget_8.setItem(9, 1, itm1)
         self.tableWidget_8.setItem(10, 1, itm2)
-        self.tableWidget_7.setItem(0, 1, itm3)
+        self.tableWidget_7.setItem(1, 1, itm3)
 
         if column == 1:     # We have checked/unchecked a MN
             self.optSet.mnColChartNbs = self.optSet.\
@@ -595,8 +621,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             # self.list_item = list(self.newMNtoSt.values())
             print 'fen princ : {}'.format(self.newMNtoSt)
             self.MNtoSt = self.newMNtoSt
-
-# TODO : continuer l'implementation
             print list(self.MNtoSt.keys())
             print list(self.MNtoSt.values())
             twitchSt_listnb = []
@@ -629,7 +653,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['seriesStimParam']))
-        self.tableWidget_7.setItem(14, 1, itm1)
+        self.tableWidget_7.setItem(15, 1, itm1)
 
     def cell_was_clicked(self, tableWidgt, listName, row, column, oneChk, col):
         """
@@ -773,7 +797,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             rootname += "/"
             self.folders = FolderOrg(animatlab_rootFolder=rootname,
                                      subdir=subdir,
-                                     python27_source_dir=self.animatLabV2ProgDir)
+                                     python27_source_dir=self.
+                                     animatLabV2ProgDir)
             self.folders.affectDirectories()
             saveAnimatLabSimDir(dirname)
 
@@ -799,7 +824,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             #                      Default parameters                        #
             # ################################################################
             # Parameters for optimization
-            listparNameOpt = ['mvtcolumn',
+            listparNameOpt = ['selectedChart',
+                              'mvtcolumn',
                               'startMvt1', 'endMvt1', 'endPos1', 'angle1',
                               'startMvt2', 'endMvt2', 'endPos2', 'angle2',
                               'startEQM', 'endEQM',
@@ -819,7 +845,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                               'maxG', 'maxWeight',
                               'defaultval', 'cmaes_sigma',
                               'fourchetteStim', 'fourchetteSyn']
-            listparValOpt = [6,
+            listparValOpt = [0,
+                             6,
                              0, 0.3, 5, 0, 5, 5.8, 10, 60,
                              3, 10,
                              1,
@@ -832,6 +859,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                              1.5, 50, 1.5, 50, 1000, -0.06, 0.0001, 2e-08,
                              50, 10, 5e-07, 100000.0, 0.0035, 5, 5]
             listparTypeOpt = [int,
+                              int,
                               float, float, float, float,
                               float, float, float, float,
                               float, float,
@@ -844,7 +872,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                               float, float, float, float, float, float, float,
                               float, float, float, float, float, float,
                               float, float]
-            listparCoulOpt = ['magenta',
+            listparCoulOpt = ['LavenderBlush',
+                              'pink',
                               'lightyellow', 'lightyellow', 'lightyellow',
                               'lightyellow', 'lightyellow', 'lightyellow',
                               'lightyellow', 'lightyellow',
@@ -890,17 +919,13 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             fileName = 'paramOpt.pkl'
             if self.loadParams(self.folders.animatlab_result_dir+fileName,
                                listparNameOpt):
-                listparNameOpt = self.optSet.paramLoebName
-                listparValOpt = self.optSet.paramLoebValue
-                listparTypeOpt = self.optSet.paramLoebType
-                listparCoulOpt = self.optSet.paramLoebCoul
+                print "parameter file found => reading params"
+                self.optSet.paramLoebCoul = listparCoulOpt
                 self.optSet.actualizeparamLoeb()
-                listparNameMarquez = self.optSet.paramMarquezName
-                listparValMarquez = self.optSet.paramMarquezValue
-                listparTypeMarquez = self.optSet.paramMarquezType
-                listparCoulMarquez = self.optSet.paramMarquezCoul
                 self.optSet.actualizeparamMarquez()
             else:
+                print "No parameter file found => default settings"
+                # If no parameter file found, then uses the default parameters
                 self.optSet.paramLoebName = listparNameOpt
                 self.optSet.paramLoebValue = listparValOpt
                 self.optSet.paramLoebType = listparTypeOpt
@@ -911,7 +936,29 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                 self.optSet.paramMarquezType = listparTypeMarquez
                 self.optSet.paramMarquezCoul = listparCoulMarquez
                 self.optSet.actualizeparamMarquez()
-            # If no parameter file found, then uses the default parameters
+            if len(self.optSet.chartName) > 1:      # if more than one chart...
+                print self.optSet.chartName
+                previousChart = self.optSet.paramLoebValue[0]
+                chartNumber = {}
+                for idx, elem in enumerate(self.optSet.chartName):
+                    chartNumber[elem] = idx
+                selectedDic = chooseChart(self.optSet)  # ... then select chart
+                # chooseChart returns a dictionary...
+                # gets the chartName from the dictionary
+                selected = selectedDic['selectedChart']
+                # ... and gets its number
+                self.optSet.selectedChart = chartNumber[selected]
+                print "selected chart number :", self.optSet.selectedChart,
+                print selected  # selected is the name of the chart
+                self.optSet.paramLoebValue[0] = self.optSet.selectedChart
+                self.optSet.actualizeparamLoeb()
+                if chartNumber[selected] != previousChart:
+                    self.optSet.paramMarquezName = listparNameMarquez
+                    self.optSet.paramMarquezValue = listparValMarquez
+                    self.optSet.paramMarquezType = listparTypeMarquez
+                    self.optSet.paramMarquezCoul = listparCoulMarquez
+                    self.optSet.actualizeparamMarquez()
+
             self.exConn = []
             for i in range(self.optSet.nbConnexions):
                 if self.optSet.tab_connexions[i][6] == "Disabled" or \
@@ -997,7 +1044,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             self.tableWidget.setItem(idx, 0, itm1)
             self.tableWidget.setItem(idx, 1, itm2)
             self.tableWidget.item(idx, 0).\
-                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[11]))
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[12]))
         self.tableWidget.resizeColumnsToContents()
         self.tableWidget.cellClicked.connect(self.stim_cell_was_clicked)
         # ################################################################
@@ -1026,7 +1073,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             self.tableWidget_2.setItem(idx, 0, itm1)
             self.tableWidget_2.setItem(idx, 1, itm2)
             self.tableWidget_2.item(idx, 0).\
-                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[15]))
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[16]))
         self.tableWidget_2.resizeColumnsToContents()
         self.tableWidget_2.cellClicked.connect(self.connex_cell_was_clicked)
 
@@ -1058,7 +1105,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             self.tableWidget_3.setItem(idx, 0, itm1)
             self.tableWidget_3.setItem(idx, 1, itm2)
             self.tableWidget_3.item(idx, 0).\
-                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[15]))
+                setBackground(QtGui.QColor(self.optSet.paramLoebCoul[16]))
         self.tableWidget_3.resizeColumnsToContents()
         self.tableWidget_3.cellClicked.connect(self.connexFR_cell_was_clicked)
 
@@ -1168,7 +1215,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.tableWidget_7.horizontalHeader().hide()
         for idx, elem in enumerate(self.optSet.paramLoebName):
             item1 = QtWidgets.QTableWidgetItem("{0} {1}".format(idx, elem))
-            item1.setTextAlignment(QtCore.Qt.AlignLeft)
+            # item1.setTextAlignment(QtCore.Qt.AlignLeft)
             txt = self.optSet.paramLoebValue[idx]
             item2 = QtWidgets.QTableWidgetItem("{0}".format(txt))
             item2.setSizeHint(QSize(500, 0))
@@ -1304,9 +1351,9 @@ def main():
     # app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     form = ReadAsimAform()  # We set the form to be our ExampleApp (design)
 
-    animatLabV2ProgDir = readAnimatLabV2ProgDir()
+    form.animatLabV2ProgDir = readAnimatLabV2ProgDir()
     dialogue = "Choose the folder where animatLab V2 is stored (includes/bin)"
-    if animatLabV2ProgDir == '':
+    if form.animatLabV2ProgDir == '':
         print "first instance to access to animatLab V2/bin"
         form.animatLabV2ProgDir = QtWidgets.QFileDialog.\
             getExistingDirectory(form, dialogue)
