@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 created on Mon Jan 23 10:11:19 2017
+@author: cattaert
 modified June 7 2017 (D.Cataert)
     in procedure "loadParams", the actual number of Loeb params is set to 41
 
@@ -20,7 +21,7 @@ modified July 17, 2017 (D.Cataert)
                             subdir=subdir)
     this is the same modification as made in GUI_AnimatLabOptimization.py
 
-modified August 24, 2017
+modified August 24, 2017 (D.Cataert)
     in actualiseSaveAprojFromAsim(asimFileName):
     [asimSimSet, asimtab_stims] = getSimSetFromAsim(optSet,
                                                     seriesStimParam,
@@ -29,7 +30,7 @@ modified August 24, 2017
                                                     asimFileName)
     getSimSetFromAsim call was acutalized according to the new format
     adopted in optimization.py
-modified August 28, 2017:
+modified August 28, 2017 (D.Cataert):
   new procedure to get the AnimatLab V2 program path
     def readAnimatLabV2ProgDir():
     filename = "animatlabV2ProgDir.txt"
@@ -41,7 +42,14 @@ modified August 28, 2017:
         directory = ""
     # print "First instance: Root directory will be created from GUI"
     return directory
-@author: cattaert
+modified September 1, 2017 (D.Cataert):
+    Handle motorstims to set automatically muscle and spindle parameters
+    two procedures added: setAnglePos and setMusclesandSpindles
+    (still in progress)
+modified September 4, 2017 (D.Cataert):
+    a new parameter has been added that indicate the chart number(in case there
+    are several charts) from which measurements are made
+    The number of parameters is now 42 (instead of 41)
 """
 import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
@@ -56,24 +64,25 @@ import pickle
 # import random
 from FoldersArm import FolderOrg
 from animatlabOptimSetting import OptimizeSimSettings
-from optimization import runMarquez, setPlaybackControlMode
+from optimization import runMarquez, runCMAe, setPlaybackControlMode
 from optimization import improveSynapses, improveSynapsesFR, improveStims
-# from optimization import enableStims, formTemplateSmooth, savecurve
-# from optimization import affichExtStim, affichConnexions, affichConnexionsFR
-# from optimization import affichChartColumn, affichNeurons
-# from optimization import affichNeuronsFR, liste
-from optimization import writeTitres, tablo, findChartName, findTxtFileName
-from optimization import savechartfile, writeBestResSuite
-from optimization import writeaddTab, testquality, copyRenameFile
+# from optimization import enableStims, formTemplateSmooth, savecurve, liste
+# from optimization import affichChartColumn
+from optimization import affichMotor
+from optimization import affichNeurons, affichNeuronsFR
+from optimization import affichExtStim
+from optimization import affichConnexions, affichConnexionsFR
+from optimization import writeTitres, tablo, findTxtFileName
+from optimization import savechartfile
+# from optimization import writeBestResSuite
+from optimization import writeaddTab
+# from optimization import testquality, copyRenameFile
 from optimization import findList_asimFiles
 from optimization import getSimSetFromAsim
 from optimization import setMotorStimsOff
-from optimization import affichExtStim
-from optimization import affichMotor
-from optimization import copyFile
+from optimization import copyFile, copyFileDir
 
 # from optimization import getlistparam
-from cma import fmin
 
 
 def show_tab_extstim():
@@ -122,11 +131,29 @@ def loadParams(paramFicName, optSet):
                 optSet.paramMarquezCoul = pickle.load(input)
             print "nb loaded param :", len(optSet.paramLoebName)
             # print "nb actual param:", len(listparNameOpt)
-            print "nb actual param:", 41
+            print "nb actual param:", 42
             # There are 41 Loeb parameters in this version
-            if len(optSet.paramLoebName) == 41:
+            nbloadedpar = len(optSet.paramLoebName)
+            if nbloadedpar == 42:
                 print "paramOpt :"
                 optSet.printParams(optSet.paramLoebName, optSet.paramLoebValue)
+                print "paramMarquez :"
+                optSet.printParams(optSet.paramMarquezName,
+                                   optSet.paramMarquezValue)
+                print '===================  Param loaded  ===================='
+                response = True
+            elif nbloadedpar == 41:
+                print "paramOpt with only 41 params:"
+                pln = ['selectedChart'] + optSet.paramLoebName
+                optSet.paramLoebName = pln
+                plv = [0] + optSet.paramLoebValue
+                optSet.paramLoebValue = plv
+                plt = [int] + optSet.paramLoebType
+                optSet.paramLoebType = plt
+                plc = ["Magenta"] + optSet.paramLoebCoul
+                optSet.paramLoebCoul = plc
+                optSet.printParams(optSet.paramLoebName,
+                                   optSet.paramLoebValue)
                 print "paramMarquez :"
                 optSet.printParams(optSet.paramMarquezName,
                                    optSet.paramMarquezValue)
@@ -143,7 +170,7 @@ def loadParams(paramFicName, optSet):
 
 
 def saveparams(filename):
-    listparnam = [
+    listparnam = ["selectedChart",
                   "mvtcolumn",
                   "startMvt1",
                   "endMvt1",
@@ -184,7 +211,7 @@ def saveparams(filename):
                   "fourchetteStim",
                   "fourchetteSyn"
                   ]
-    listparval = [
+    listparval = [optSet.selectedChart,
                   optSet.mvtcolumn,
                   optSet.startMvt1,
                   optSet.endMvt1,
@@ -232,20 +259,21 @@ def saveparams(filename):
 
 def setAnglePos(jointNb, motorName, val, motorStart, motorEnd):
     """
-
+    sets angle positions and velocities for motors
     """
-    # ====== copying original asim File to Temp Directory  ========
+    # ========== copying original asim File to Temp Directory  ===========
     print "copying original asim File to Temp Directory"
-    simFileName = findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
+    # simFileName=findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
+    simFileName = os.path.split(model.asimFile)[-1]
     sourceDir = folders.animatlab_commonFiles_dir
     destDir = folders.animatlab_rootFolder + "temp/"
     if not os.path.exists(destDir):
         os.makedirs(destDir)
     copyFile(simFileName, sourceDir, destDir)
-    # ============= Disable all external Stimuli...  ==============
+    # ================= Disable all external Stimuli...  =================
     for stim in range(optSet.nbStims):
         optSet.ExternalStimuli[stim].find("Enabled").text = 'False'
-    # ====== prepares simSet for mvt control and runprojMan  ======
+    # ========== prepares simSet for mvt control and runprojMan  =========
     chartRootName = "imposedMaxAmplMvt"
     simSet = SimulationSet.SimulationSet()
     simSet.samplePts = []
@@ -256,24 +284,31 @@ def setAnglePos(jointNb, motorName, val, motorStart, motorEnd):
     print simSet.samplePts
     projMan.make_asims(simSet)
     projMan.run(cores=-1)
-    # ================== Saves the chart result  ==================
-    tab = tablo(folders, findTxtFileName(folders, 1))
+    # ====================== Saves the chart result  =====================
+    tab = tablo(folders, findTxtFileName(model, optSet, 1))
     comment = ""
     destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
     chartname = savechartfile(chartRootName, destdir, tab, comment)
     print "... chart file {} saved; {}".format(chartname, comment)
-    # ================== Modifies the asim file  ==================
+    # ====================== Modifies the asim file  =====================
     for idx in range(len(motorName)):
         motorstim = model.getElementByName(motorName[idx])
         motorstim.find("Equation").text = str(val[idx])
         motorstim.find("StartTime").text = str(motorStart[idx])
         motorstim.find("EndTime").text = str(motorEnd[idx])
         motorstim.find("Enabled").text = "True"
-    # ================== Saves the new asim file ==================
+    # ====================== Saves the new asim file =====================
     model.saveXML(overwrite=True)
     show_tab_extstim()
     show_tab_motorstim()
-    # ===== copying original asim File back to FinalModel Directory  ======
+    # === copying asim File from FinalModel to MaxMvtModel Directory  ====
+    print "\nCopying asim File from FinalModel to MaxMvtModel Directory"
+    sourceDir = folders.animatlab_commonFiles_dir
+    destDir = folders.animatlab_rootFolder + "MaxMvtModel/"
+    if not os.path.exists(destDir):
+        os.makedirs(destDir)
+    copyFile(simFileName, sourceDir, destDir)
+    # ===== copying original asim File back to FinalModel Directory  =====
     print "\ncopying original asim File back to FinalModel Directory"
     sourceDir = folders.animatlab_rootFolder + "temp/"
     destDir = folders.animatlab_commonFiles_dir
@@ -325,162 +360,7 @@ def setMusclesandSpindles():
 #  et refaire les mesures
 
 
-def execMarquez():
-    runMarquez(folders, model, projMan, optSet.ExternalStimuli,
-               optSet.tab_stims, optSet.nbruns, optSet.mnColChartNbs,
-               optSet.sensColChartNbs, optSet.rank_chart_col,
-               optSet.chartColNames, optSet.twitStMusclesStNbs,
-               optSet.startTwitch, optSet.endTwitch,
-               optSet.chartStart, optSet.rate,
-               optSet.eta, optSet.timeMes, optSet.delay)
-
-
-def optimizeStims():
-    improveStims(folders, model, projMan, optSet.allPhasesStim,
-                 optSet.ExternalStimuli,
-                 optSet.seriesStimParam, optSet.mvtcolumn,
-                 optSet.mnColChartNbs, optSet.rate,
-                 optSet.nbstimtrials, optSet.nbsteps, epoch,
-                 optSet.listeNeurons, optSet.listeNeuronsFR,
-                 optSet.deltaStimCoeff, optSet.limQuality,
-                 optSet.maxDeltaStim,
-                 optSet.activThr, optSet.coactivityFactor,
-                 optSet.limits, optSet.defaultval)
-
-
-def optimizeSynapses():
-    improveSynapses(folders, model, projMan, optSet.allPhasesSyn,
-                    optSet.Connexions,
-                    optSet.seriesSynParam,
-                    optSet.mvtcolumn, optSet.mnColChartNbs, optSet.rate,
-                    optSet.nbsyntrials, optSet.nbsteps, epoch,
-                    optSet.listeNeurons, optSet.listeNeuronsFR,
-                    optSet.multSynCoeff, optSet.limQuality,
-                    optSet.maxMultSyn,
-                    optSet.activThr, optSet.coactivityFactor,
-                    optSet.limits, optSet.defaultval)
-
-
-def optimizeSynapsesFR():
-    improveSynapsesFR(folders, model, projMan, optSet.allPhasesSynFR,
-                      optSet.SynapsesFR,
-                      optSet.seriesSynFRParam, optSet.mvtcolumn,
-                      optSet.mnColChartNbs, optSet.rate,
-                      optSet.nbsyntrials, optSet.nbsteps, epoch,
-                      optSet.listeNeurons, optSet.listeNeuronsFR,
-                      optSet.multSynCoeff, optSet.limQuality,
-                      optSet.maxMultSyn,
-                      optSet.activThr, optSet.coactivityFactor,
-                      optSet.limits, optSet.defaultval)
-
-
-def execLoeb():
-    global epoch
-    global procedure
-    procedure = "runLoeb"
-    saveparams(folders.subdir + "Loeb.par")
-    for epoch in range(optSet.nbepoch):
-        print "epoch=", epoch
-        optimizeStims()
-        optimizeSynapses()
-        optimizeSynapsesFR()
-
-
-def runSimMvt(x, chartRootName, fitValFileName, affiche):
-    simSet = SimulationSet.SimulationSet()
-    stimParName = optSet.stimParName
-    stimMax = optSet.stimMax
-    synParName = optSet.synParName
-    synMax = optSet.synMax
-    for st in range(len(stimParName)):
-        simSet.set_by_range({stimParName[st]: [x[st]*stimMax[st]]})
-    for sy in range(len(synParName)):
-        simSet.set_by_range({synParName[sy]: [x[st+1+sy]*synMax[sy]]})
-    if affiche == 1:
-        print simSet.samplePts
-    projMan.make_asims(simSet)
-    projMan.run(cores=-1)
-    tab = tablo(folders, findTxtFileName(folders, 1))
-    quality = testquality(folders, tab,
-                          optSet.mvtcolumn, optSet.mnColChartNbs,
-                          optSet.activThr, optSet.coactivityFactor,
-                          optSet.listeNeurons, optSet.listeNeuronsFR,
-                          optSet.lineStart, optSet.lineEnd,
-                          optSet.template, "")
-    [mse, coactpenality, coact] = quality
-    destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
-    err = mse+coactpenality
-    # txt = "Chart"+str(simNb)+"; "
-    txt = "err:{:4.4f}; mse:{:4.4f}; coactpenality:{}; coact:{:4.8f}"
-    comment = txt.format(err, mse, coactpenality, coact)
-    chartname = savechartfile(chartRootName, destdir, tab, comment)
-    print "... chart file {} saved; {}".format(chartname, comment)
-    trial = chartname[0:chartname.find(".")]
-    res = [trial, mse+coactpenality, mse, coactpenality, coact]
-    writeBestResSuite(folders, fitValFileName, res, 0)
-    return res
-
-
-def runCMAe(nbevals):
-    global procedure, cmaes_sigma, simNb
-    procedure = "runCMAe"
-    simNb = 0
-
-    def f(x):
-        global simNb
-        res = runSimMvt(x, 'CMAeChart', "CMAefitCourse.txt", 0)
-        valeurs = [simNb]
-        for i in range(len(x)):
-            valeurs.append(x[i])
-        writeBestResSuite(folders, "CMAeXValues.txt", valeurs, 0)
-        simNb += 1
-        err = res[1]
-        return err
-
-    def improve(nbevals):
-        stimParName = optSet.stimParName
-        stimMax = optSet.stimMax
-        synParName = optSet.synParName
-        synMax = optSet.synMax
-        res = fmin(f, optSet.x0, optSet.cmaes_sigma,
-                   options={'bounds': [optSet.lower, optSet.upper],
-                            'verb_log': 3,
-                            'verb_disp': True,
-                            'maxfevals': nbevals,
-                            'seed': 0})
-        x = res[0]
-
-        # Save the best asim file in simFiles directory
-        simSet = SimulationSet.SimulationSet()
-        for st in range(len(stimParName)):
-            simSet.set_by_range({stimParName[st]: [x[st]*stimMax[st]]})
-        for sy in range(len(synParName)):
-            simSet.set_by_range({synParName[sy]: [x[st+1+sy]*synMax[sy]]})
-        print simSet.samplePts
-        projMan.make_asims(simSet)
-        # Copy sim file from "SimFiles" to "CMAeBestSimFiles" directory
-        destdir = folders.animatlab_rootFolder + "CMAeBestSimFiles/"
-        sourcedir = folders.animatlab_simFiles_dir
-        simFileName = findChartName(folders.animatlab_commonFiles_dir)[0]
-        filesource = simFileName + "-1.asim"
-        filedest = simFileName + ".asim"
-        comment = ""
-        copyRenameFile(sourcedir, filesource, destdir, filedest, comment)
-        return [res, simSet]
-
-    # getlistparam(optSet.tab_stims, optSet.tab_connexions,
-    #              optSet.tab_connexionsFR)
-    optSet.cmaes_sigma = min(optSet.upper)*0.7
-    comment = ["trial", "eval", "mse", "coactpenality", "coact"]
-    writeBestResSuite(folders, "CMAeFitCourse.txt", comment, 1)
-    saveparams(folders.subdir + "CMAe.par")
-    [res, simSet] = improve(nbevals)
-    print res[0]
-    print "final score:", res[1]
-    return [res, simSet]
-
-
-def actualiseSaveAprojFromAsim(asimFileName):
+def actualiseSaveAprojFromAsim(asimFileName, aprojFileName):
     seriesStimParam = ['CurrentOn', 'StartTime', 'EndTime']
     seriesSynParam = ['G']
     seriesSynFRParam = ['Weight']
@@ -489,9 +369,68 @@ def actualiseSaveAprojFromAsim(asimFileName):
                                                     seriesSynParam,
                                                     seriesSynFRParam,
                                                     asimFileName)
-    model.actualizeAproj(asimSimSet, aprojSaveDir)
-    model.actualizeAprojStimState(asimtab_stims, aprojSaveDir)
+    model.actualizeAproj(asimSimSet)
+    model.actualizeAprojStimState(asimtab_stims)
     model.saveXMLaproj(aprojSaveDir + aprojFileName)
+
+
+# ###########################  Marquez procedures #############################
+def execMarquez():
+    runMarquez(folders, model, optSet, projMan)
+    sourceDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+    asimFileNamesList = findList_asimFiles(sourceDir)
+    if asimFileNamesList != []:
+        asimFileName = folders.animatlab_rootFolder +\
+            "FinalTwitchModel/" + asimFileNamesList[0]
+    ficname = aprojFileName
+    name = ficname.split(".")[0]
+    ext = ficname.split(".")[1]
+    ficname = name + "Marquez." + ext
+    actualiseSaveAprojFromAsim(asimFileName, ficname)
+
+
+# ############################# Loeb procedures ###############################
+def optimizeStims():
+    improveStims(folders, model, optSet, projMan, epoch)
+
+
+def optimizeSynapses():
+    improveSynapses(folders, model, optSet, projMan, epoch)
+
+
+def optimizeSynapsesFR():
+    improveSynapsesFR(folders, model, optSet, projMan, epoch)
+
+
+def execLoeb():
+    global epoch
+    # global procedure
+    # procedure = "runLoeb"
+    saveparams(folders.subdir + "Loeb.par")
+    for epoch in range(optSet.nbepoch):
+        print "epoch=", epoch
+        optimizeStims()
+        optimizeSynapses()
+        optimizeSynapsesFR()
+    ficname = aprojFileName
+    name = ficname.split(".")[0]
+    ext = ficname.split(".")[1]
+    ficname = name + "Loeb." + ext
+    actualiseSaveAprojFromAsim(model.asimFile, ficname)
+# =============================================================================
+
+
+# ###########################   CMAe  procedures  #############################
+def execCMAe():
+    saveparams(folders.subdir + "CMAe.par")
+    [res, simSet] = runCMAe(folders, model, optSet, projMan, nbevals=10)
+    model.actualizeAproj(simSet)
+    ficname = aprojFileName
+    name = ficname.split(".")[0]
+    ext = ficname.split(".")[1]
+    ficname = name + "CMAe." + ext
+    model.saveXMLaproj(aprojSaveDir + ficname)
+# =============================================================================
 
 
 # ============================================================================
@@ -500,7 +439,6 @@ def actualiseSaveAprojFromAsim(asimFileName):
 if __name__ == '__main__':
     """
     """
-
     animatsimdir = readAnimatLabDir()
     animatLabV2ProgDir = readAnimatLabV2ProgDir()
     if animatsimdir != "":
@@ -512,6 +450,12 @@ if __name__ == '__main__':
                             python27_source_dir=animatLabV2ProgDir,
                             subdir=subdir)
         folders.affectDirectories()
+        aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
+        if not os.path.exists(aprojSaveDir):
+            os.makedirs(aprojSaveDir)
+            copyFileDir(animatsimdir,
+                        aprojSaveDir,
+                        copy_dir=0)
     else:
         print "No selected directory  run GUI_AnimatLabOptimization.py"
         quit
@@ -548,7 +492,19 @@ if __name__ == '__main__':
         else:
             print "paramOpt.pkl MISSING !!, run 'GUI_animatlabOptimization.py'"
             print
-
+        optSet.tab_motors = affichMotor(model, optSet.motorStimuli, 1)
+        # optSet.tab_chartcolumns = affichChartColumn(optSet.ChartColumns, 1)
+        optSet.tab_neurons = affichNeurons(optSet.Neurons, 1)
+        optSet.tab_neuronsFR = affichNeuronsFR(optSet.NeuronsFR, 1)
+        optSet.tab_connexions = affichConnexions(model, optSet.Connexions, 1)
+        optSet.tab_connexionsFR = affichConnexionsFR(model,
+                                                     optSet.SynapsesFR, 1)
+        optSet.tab_stims = affichExtStim(optSet.ExternalStimuli, 1)
+        # optSet.synsTot, optSet.synsTotFR = [], []
+        print
+        # ###################################################################
+        model.saveXML(overwrite=True)
+        # ###################################################################
         writeTitres(folders, 'stim', optSet.allPhasesStim,
                     optSet.tab_stims, optSet.seriesStimParam)
         writeTitres(folders, 'syn', optSet.allPhasesSyn,
@@ -568,30 +524,15 @@ if __name__ == '__main__':
         # execLoeb()
         # ###################################################################
 
-        # --------------------------------------------------------
-        #  parameters for CMAe
-        # --------------------------------------------------------
-        aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
-        if not os.path.exists(aprojSaveDir):
-            os.makedirs(aprojSaveDir)
-
         # ###################################################################
-        # [res, simSet] = runCMAe(100)
-        # model.actualizeAproj(simSet, aprojSaveDir)
-        # model.saveXMLaproj(aprojSaveDir + aprojFileName)
+        # execCMAe()
         # ###################################################################
 
-        # asimFileName = folders.animatlab_rootFolder +\
-        #     "FinalModel/" + os.path.split(model.asimFile)[-1]
         # asimFileName = folders.animatlab_rootFolder +\
         #    "CMAeBestSimFiles/" + os.path.split(model.asimFile)[-1]
         # asimFileName = folders.animatlab_rootFolder +\
         #    "FinalTwitchModel/" + os.path.split(model.asimFile)[-1]
-        sourceDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
-        asimFileNamesList = findList_asimFiles(sourceDir)
-        if asimFileNamesList != []:
-            asimFileName = folders.animatlab_rootFolder +\
-                "FinalTwitchModel/" + asimFileNamesList[0]
+
         # Here, indicate the .asim file from which to extract parameters
         # ###################################################################
         # actualiseSaveAprojFromAsim(asimFileName)
