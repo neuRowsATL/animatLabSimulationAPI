@@ -68,6 +68,9 @@ from os.path import isfile, join
 # from copy import copy
 # import class_chartData as chartData
 from math import sqrt
+from math import fmod
+from cma import fmin
+
 # from copy import deepcopy
 import datetime
 
@@ -106,9 +109,13 @@ def callback_compressData(asimFile, results, obj_simRunner):
 
 def affich_table(corr):
     str_line = ''
+    tabspace = ""
     for i in range(len(corr)):
         for j in range(len(corr[i])):
-            str_line += '{}\t'.format(corr[i][j])
+            tabspace = ""
+            for k in range(2-((len(corr[i][j])+0)/8)):
+                tabspace += "\t"
+            str_line += '{}{}'.format(corr[i][j], tabspace)
         # str_line += '\t'
         print str_line
         str_line = ''
@@ -515,7 +522,7 @@ def getSimSetFromAsim(optSet,
                       seriesStimParam, seriesSynParam, seriesSynFRParam,
                       asimFileName):
     asimModel = AnimatLabModel.AnimatLabSimFile(asimFileName)
-    asimreadAnimatLabSimDir = asimModel.getElementByType("readAnimatLabSimDir")
+    asimreadAnimatLabSimDir = asimModel.getElementByType("ExternalStimuli")
     asimtab_stims = affichExtStim(asimreadAnimatLabSimDir, 1)
 
     asimConnexions = asimModel.getElementByType("Connexions")
@@ -634,7 +641,16 @@ def findList_asimFiles(directory):
     return list_asim
 
 
-def findChartName(directory):
+"""
+def findChartName2(model):
+    chartName = []
+    chart = model.getElementByType("Chart")
+    for ch in list(chart):
+        chartName.append(ch.find("Name").text)
+    return chartName
+
+
+def oldfindChartName(directory):
     onlyfiles = [f for f in listdir(directory)
                  if isfile(join(directory, f))]
     # print onlyfiles
@@ -652,34 +668,22 @@ def findChartName(directory):
             # print simN
     chartName = simN + "-1_" + chartN + ".txt"
     return [simN, chartN, chartName]
+"""
 
 
-def findTxtFileName(folders, x):
-    simFileName = findChartName(folders.animatlab_commonFiles_dir)[0]
-    chartFileName = findChartName(folders.animatlab_commonFiles_dir)[1]
+def findChartName(model, optSet):
+    simN = (os.path.split(model.asimFile)[-1]).split(".")[-2]
+    chartN = optSet.chartName[optSet.selectedChart]
+    chartName = simN + "-1_" + chartN + ".txt"
+    return [simN, chartN, chartName]
+
+
+def findTxtFileName(model, optSet, x):
+    simFileName = findChartName(model, optSet)[0]
+    chartFileName = findChartName(model, optSet)[1]
     txtFileName = simFileName + "-" + str(x) + "_" + chartFileName + '.txt'
     # print "reading {}".format(txtFileName)
     return txtFileName
-
-
-def findFreq(folders, model, projMan, mvtcolumn):
-    stim = model.getElementByType("readAnimatLabSimDir")
-    stimName = stim[0].find("Name").text
-    initval = float(stim[0].find("CurrentOn").text)
-    simSet = SimulationSet.SimulationSet()
-    simSet.set_by_range({stimName + ".CurrentOn": [initval]})
-    # sims.add_each_callback(callback_compressData)
-    # projMan = ProjectManager.ProjectManager('Test Project')
-    # projMan.set_aproj(model)    # Assign the animatLabModel object
-    # projMan.set_simRunner(sims)    # Assign the simulationSet object
-    projMan.make_asims(simSet)
-    projMan.run(cores=-1)
-    table = tablo(folders, findTxtFileName(folders, 1))
-    inter = table[2][1] - table[1][1]  # time is the second column -> 1
-    freq = int(1/inter)
-    mvtcolname = table[0][mvtcolumn]
-    print "rate = {}; mvtcolumn name = {}".format(freq, mvtcolname)
-    return freq
 
 
 def formTemplate(rate, startMvt1, endMvt1, angle1,
@@ -906,7 +910,7 @@ def chargeBestSynValues(folders, model, filename, Connex,
         f = open(folders.animatlab_result_dir + filename, 'r')
         while 1:
             txt = f.readline()
-            # print txt
+            print txt
             if txt == '':
                 break
             else:
@@ -952,6 +956,12 @@ def chargeBestSynValues(folders, model, filename, Connex,
     return tmp
 
 
+def copyFile(filename, src, dst):
+    sourcefile = src + filename
+    destfile = dst + filename
+    shutil.copy(sourcefile, destfile)
+
+
 def copyRenameFile(sourcedir, filesource, destdir, filedest, comment):
     if not os.path.exists(destdir):
         os.makedirs(destdir)
@@ -965,7 +975,7 @@ def copyRenameFile(sourcedir, filesource, destdir, filedest, comment):
     shutil.copy(src, tgt)
 
 
-def copyDirectory(sourcedir, filesource, destdir, filedest, comment):
+def copyDirectory(sourcedir, destdir):
     if not os.path.exists(destdir):
         os.makedirs(destdir)
     # Copy filesource -> filedest
@@ -974,6 +984,19 @@ def copyDirectory(sourcedir, filesource, destdir, filedest, comment):
         tgt = os.path.join(destdir, f)
         if os.path.isdir(src):
             shutil.copytree(src, tgt)
+        else:
+            shutil.copy(src, tgt)
+
+
+def copyFileDir(sourcedir, destdir, copy_dir=0):
+    if not os.path.exists(destdir):
+        os.makedirs(destdir)
+    for f in os.listdir(sourcedir):
+        src = os.path.join(sourcedir, f)
+        tgt = os.path.join(destdir, f)
+        if os.path.isdir(src):
+            if copy_dir:
+                shutil.copytree(src, tgt)
         else:
             shutil.copy(src, tgt)
 
@@ -1144,6 +1167,72 @@ def writeTitres(folders, pre, allPhases, tab_targets, seriesParam):
         writeBestResSuite(folders, pre + 'bestfitsCoactSuite.txt', titres2, 1)
 
 
+def enableStims(ExternalStimuli, stims):
+    nbStims = len(ExternalStimuli)
+    for stim in range(nbStims):
+        ExternalStimuli[stim].find("Enabled").text = 'False'
+    for stim in range(len(stims)):
+        stimRank = stims[stim]
+        ExternalStimuli[stimRank].find("Enabled").text = 'True'
+
+
+def setMotorStimsOff(model, motorStimuli):
+    """
+    sets motors stimulis to "disabled"
+    """
+    for i in range(len(motorStimuli)):
+        motorEl = motorStimuli[i]
+        for idx, elem in enumerate(motorEl):
+            # nomMoteur = elem.find("Name").text
+            # print nomMoteur,
+            # space = ""
+            # for sp in range(3-len(nomMoteur)/8):
+            #     space += "\t"
+            # print space + "set from  ",
+            # print elem.find("Enabled").text,
+            elem.find("Enabled").text = "False"
+            # print "   to   ", elem.find("Enabled").text
+    affichMotor(model, motorStimuli, 0)
+    print "motorstimuli have been disabled"
+
+
+def setPlaybackControlMode(model, mode):
+    """
+    sets speed to 0 for Fastest and to 1 for matching Physics Steps
+    """
+    asimroot = model.tree.getroot()
+    oldmode = asimroot.find("PlaybackControlMode").text
+    if oldmode == '0':
+        oldmodestr = "fastest"
+    elif oldmode == '1':
+        oldmodestr = "match Physics"
+    else:
+        oldmodestr = "perso"
+    asimroot.find("PlaybackControlMode").text = str(mode)
+    # After changing a property, save the updated model
+    # model.saveXML(overwrite=True)   # in the FinalModel dir
+    if mode == 0:
+        modestr = "fastest"
+    elif mode == 1:
+        modestr = "match Physics"
+    else:
+        modestr = "perso"
+    print "PlaybackControlMode has been changed from", oldmodestr,
+    print "to", modestr
+    print
+
+
+def setGravity(model, gravity):
+    asimroot = model.tree.getroot()
+    pathE = "Environment"
+    oldGravity = asimroot.find(pathE).find("Gravity").text
+    asimroot.find(pathE).find("Gravity").text = str(gravity)
+    # enableStims(ExternalStimuli, twitStMusclesSt)
+    # After changing a property, save the updated model
+    model.saveXML(overwrite=True)   # in the FinalModel dir
+    print "Gravity has been changed from", oldGravity, "to", gravity
+
+
 ###########################################################################
 #                           OPTIMIZATION PROCEDURES
 ###########################################################################
@@ -1179,13 +1268,10 @@ def coactivityVN(tabMN0, tabMN1, lineStart, lineEnd,
     return [coactpenality, coact]
 
 
-def testquality(folders, table, mvtcolumn, mnCol,
-                activThr, coactivityFactor,
-                listeNeurons, listeNeuronsFR,
-                lineStart, lineEnd, template, comment):
-    tab = extractCol(table, mvtcolumn)
-    tabMN0 = extractCol(table, mnCol[0])
-    tabMN1 = extractCol(table, mnCol[1])
+def testquality(folders, optSet, table, template, comment):
+    tab = extractCol(table, optSet.mvtcolumn)
+    tabMN0 = extractCol(table, optSet.mnColChartNbs[0])
+    tabMN1 = extractCol(table, optSet.mnColChartNbs[1])
     coactpenality = 0.
     coact = 0.
     # quality = variance(tab)
@@ -1193,12 +1279,14 @@ def testquality(folders, table, mvtcolumn, mnCol,
     dmse = 0
     msetab = []
     mse = MeanSquarreErrorTemplate(tab, template,
-                                   lineStart+30, lineEnd-30, lag)
+                                   optSet.lineStart+30,
+                                   optSet.lineEnd-30, lag)
     msetab.append(mse)
     prevmse = mse
     while (dmse <= 0) and (lag <= 30):
         mse = MeanSquarreErrorTemplate(tab, template,
-                                       lineStart+30, lineEnd-30, lag)
+                                       optSet.lineStart+30,
+                                       optSet.lineEnd-30, lag)
         if lag == -30:
             print comment, mse,
         msetab.append(mse)
@@ -1206,58 +1294,56 @@ def testquality(folders, table, mvtcolumn, mnCol,
         prevmse = mse
         lag += 1
     mse = min(msetab)
-    print "\t -->   min mse = ", mse,
+    print "\t -->   min mse = ", mse, coactpenality, coact,
     # cost function: coactivation of MN
     if min(tabMN0[0]) < 0:
-        res = coactivityVN(tabMN0, tabMN1, lineStart, lineEnd,
-                           activThr, coactivityFactor)
+        res = coactivityVN(tabMN0, tabMN1, optSet.lineStart, optSet.lineEnd,
+                           optSet.activThr, optSet.coactivityFactor)
     else:
-        res = coactivityFR(tabMN0, tabMN1, lineStart, lineEnd,
-                           coactivityFactor)
+        res = coactivityFR(tabMN0, tabMN1, optSet.lineStart, optSet.lineEnd,
+                           optSet.coactivityFactor)
     coactpenality = res[0]
     coact = res[1]
 
     return [mse, coactpenality, coact]
 
 
-def comparetests(folders, step, value_base, value_minus, value_plus,
+###########################################################################
+#                           Loeb procedures
+###########################################################################
+def comparetests(folders, model, optSet, step,
+                 value_base, value_minus, value_plus,
+                 template,
+                 bestfit, bestfitCoact, rang):
+    """
+        folders, model, optSet, step,
+                 value_base, value_minus, value_plus,
                  mvtcolumn, mnCol, listeNeurons, listeNeuronsFR,
                  lineStart, lineEnd, template,
                  activThr, coactivityFactor,
                  bestfit, bestfitCoact, limQuality, rang):
+    """
 
     global initialvalue
     txtchart = []
     # improved = 0
     # bestfitCoact = 100000.
-    minus = tablo(folders, findTxtFileName(folders, 1))
+    minus = tablo(folders, findTxtFileName(model, optSet, 1))
     # Analyzes the quality of the results (here we just look at stability
     #                               after movement was supposed to stop)
-    rep = testquality(folders, minus,
-                      mvtcolumn, mnCol,
-                      activThr, coactivityFactor,
-                      listeNeurons, listeNeuronsFR,
-                      lineStart, lineEnd, template, "minus")
+    rep = testquality(folders, optSet, minus, template, "minus")
     [mseminus, coact_minus, comin] = rep
     # print "quality_minus = {}".format(quality_minus)
     quality_minus = mseminus + coact_minus
-    plus = tablo(folders, findTxtFileName(folders, 2))
-    rep = testquality(folders, plus,
-                      mvtcolumn, mnCol,
-                      activThr, coactivityFactor,
-                      listeNeurons, listeNeuronsFR,
-                      lineStart, lineEnd, template, "plus")
+    plus = tablo(folders, findTxtFileName(model, optSet, 2))
+    rep = testquality(folders, optSet, plus, template, "plus")
     [mseplus, coact_plus, coplus] = rep
     quality_plus = mseplus + coact_plus
     # print "quality_plus = {}".format(quality_plus)
 
     if step == 0:
-        base = tablo(folders, findTxtFileName(folders, 3))
-        rep = testquality(folders, base,
-                          mvtcolumn, mnCol,
-                          activThr, coactivityFactor,
-                          listeNeurons, listeNeuronsFR,
-                          lineStart, lineEnd, template, "base")
+        base = tablo(folders, findTxtFileName(model, optSet, 3))
+        rep = testquality(folders, optSet, base, template, "base")
         [msebase, coact_base, coba] = rep
         quality_base = msebase + coact_base
         txt1 = "quality_minus = {}\tquality_plus = {}\tquality_base = {}"
@@ -1280,7 +1366,7 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
             bestfit = quality_base
             bestvalue = value_base
             initialvalue = value_base
-            finalAngle = base[lineEnd][mvtcolumn]
+            finalAngle = base[optSet.lineEnd][optSet.mvtcolumn]
             bestfitCoact = coact_base
     else:
         if quality_minus == quality_plus:
@@ -1288,7 +1374,7 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
             bestfit = quality_base
             bestvalue = value_base
             initialvalue = value_base
-            finalAngle = plus[lineEnd][mvtcolumn]
+            finalAngle = plus[optSet.lineEnd][optSet.mvtcolumn]
             bestfitCoact = coact_base
             # if this parameter has no effect then stop trying it
 
@@ -1303,9 +1389,9 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
         if sortQuality[0][0] == 'quality_base':  # best quality is the first
             initialvalue = value_base
             if step == 0:
-                finalAngle = base[lineEnd][mvtcolumn]
+                finalAngle = base[optSet.lineEnd][optSet.mvtcolumn]
             else:
-                finalAngle = plus[lineEnd][mvtcolumn]
+                finalAngle = plus[optSet.lineEnd][optSet.mvtcolumn]
             print "previous bestfit = {}".format(bestfit)
             if (quality_base - bestfit) <= 0.00000001:
                 print "best base value={}".format(value_base)
@@ -1319,7 +1405,7 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
             #    bestfit = quality_base
         elif sortQuality[0][0] == 'quality_plus':
             initialvalue = value_plus
-            finalAngle = plus[lineEnd][mvtcolumn]
+            finalAngle = plus[optSet.lineEnd][optSet.mvtcolumn]
             print "previous bestfit = {}".format(bestfit)
             if (quality_plus - bestfit) <= 0.00000001:
                 print "best plus value={}".format(value_plus)
@@ -1332,7 +1418,7 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
             #   bestvalue = value_plus
         elif sortQuality[0][0] == 'quality_minus':
             initialvalue = value_minus
-            finalAngle = minus[lineEnd][mvtcolumn]
+            finalAngle = minus[optSet.lineEnd][optSet.mvtcolumn]
             print "previous bestfit = {}".format(bestfit)
             if (quality_minus - bestfit) <= 0.00000001:
                 print "best minus value={}".format(value_minus)
@@ -1344,7 +1430,7 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
             # else:
             #    bestvalue = value_minus
 
-    if bestfit < limQuality:
+    if bestfit < optSet.limQuality:
         print "bestfit < lim => stop steps of rang : {}".format(rang)
         # bestvalue = tab_stims[stimRank][param]
         stop = 1
@@ -1356,15 +1442,12 @@ def comparetests(folders, step, value_base, value_minus, value_plus,
     return res
 
 
-def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
-                      readAnimatLabSimDir, tab_stims, listeNeurons,
-                      listeNeuronsFR,
-                      mvtcolumn, mnCol, rate, lineStart, lineEnd,
-                      rang, step, trial, epoch,
-                      deltaStim, maxDeltaStim, limits, limQuality,
-                      activThr, coactivityFactor,
-                      initialvalue, bestfit, bestfitCoact, template):
-    maxStim = limits[0]
+def runThreeStimTests(folders, model, optSet, projMan, simSet,
+                      paramName, stimRank, rang,
+                      step, trial, epoch,
+                      deltaStim, initialvalue, template,
+                      bestfit, bestfitCoact):
+    maxStim = optSet.limits[0]
     simSet.samplePts = []
     deltaStimval = abs(initialvalue) * deltaStim    # width of the test
     value_base = initialvalue
@@ -1385,7 +1468,7 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
         if value_minus < 0:
             value_minus = 0
         if paramName == 'EndTime':
-            start_time = float(readAnimatLabSimDir[stimRank]
+            start_time = float(optSet.ExternalStimuli[stimRank]
                                .find('StartTime').text)
             end_time = value_minus
             if end_time < start_time:
@@ -1393,16 +1476,17 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
                 value_minus = end_time
         if paramName == 'StartTime':
             start_time = value_plus
-            end_time = float(readAnimatLabSimDir[stimRank].find('EndTime').text)
+            end_time = float(optSet.ExternalStimuli[stimRank]
+                             .find('EndTime').text)
             if end_time < start_time:
                 start_time = end_time - 0.01
                 value_plus = start_time
 
     if step == 0:
-        simSet.set_by_range({tab_stims[stimRank][0] + "." +
+        simSet.set_by_range({optSet.tab_stims[stimRank][0] + "." +
                             paramName: [value_minus, value_plus, value_base]})
     else:
-        simSet.set_by_range({tab_stims[stimRank][0] + "." +
+        simSet.set_by_range({optSet.tab_stims[stimRank][0] + "." +
                             paramName: [value_minus, value_plus]})
     message = "\nEpoch {}; Trial {}; Param {}; STEP {};"
     message += "deltaStim ={}; deltaStimval = {}"
@@ -1411,15 +1495,19 @@ def runThreeStimTests(folders, model, projMan, simSet, stimRank, paramName,
     projMan.make_asims(simSet)
     projMan.run(cores=-1)
     # reading of the result files and storing in tables
-    res = comparetests(folders, step, value_base, value_minus, value_plus,
-                       mvtcolumn, mnCol, listeNeurons, listeNeuronsFR,
-                       lineStart, lineEnd, template,
-                       activThr, coactivityFactor,
-                       bestfit, bestfitCoact, limQuality, rang)
+    res = comparetests(folders, model, optSet, step,
+                       value_base, value_minus, value_plus,
+                       template,
+                       bestfit, bestfitCoact, rang)
     return res
 
 
-def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
+def improveStimparam(folders, model, optSet, projMan, simSet,
+                     paramName, stimRank, rang, trial, epoch,
+                     deltaStim, initialvalue, template, bestfit, bestfitCoact):
+    """
+        folders, model, optSet, projMan, simSet,
+                     stimRank, paramName,
                      readAnimatLabSimDir, tab_stims, listeNeurons,
                      listeNeuronsFR,
                      mvtcolumn, mnCol, rate, lineStart, lineEnd,
@@ -1428,29 +1516,25 @@ def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
                      activThr, coactivityFactor,
                      initialvalue, template, nbsteps,
                      bestfit, bestfitCoact):
+    """
     # global deltaStim, number, bestfit
     previous_bestfit = bestfit
     # previous_bestfitcoact = bestfitCoact
     bestvalue = 0
     step = 0
     chartname = ""
-    while step < nbsteps:
-        result = runThreeStimTests(folders, model, projMan, simSet,
-                                   stimRank, paramName,
-                                   readAnimatLabSimDir, tab_stims,
-                                   listeNeurons, listeNeuronsFR,
-                                   mvtcolumn, mnCol, rate, lineStart, lineEnd,
-                                   rang, step, trial, epoch,
-                                   deltaStim, maxDeltaStim, limits, limQuality,
-                                   activThr, coactivityFactor,
-                                   initialvalue, bestfit, bestfitCoact,
-                                   template)
+    while step < optSet.nbsteps:
+        result = runThreeStimTests(folders, model, optSet, projMan, simSet,
+                                   paramName, stimRank, rang,
+                                   step, trial, epoch,
+                                   deltaStim, initialvalue, template,
+                                   bestfit, bestfitCoact)
         bestvalue, bestfit, stop = result[0], result[1], result[2]
         txtchart, bestfitCoact = result[3], result[4]
 
         if stop:
             print "ineffective parameter => abandon improving"
-            step = nbsteps  # stop trying improvement with this param
+            step = optSet.nbsteps  # stop trying improvement with this param
         # sets the new configuration
         initialvalue = bestvalue
         print "best fit = {}; best value = {}".format(bestfit, bestvalue)
@@ -1459,31 +1543,40 @@ def improveStimparam(folders, model, projMan, simSet, stimRank, paramName,
             deltaStim = deltaStim / 2  # reduces increment if no improvement
         else:
             # chartfile is saved only if there were an improvement
-            comment = tab_stims[stimRank][0] + '\t' + paramName + '\t'\
+            comment = optSet.tab_stims[stimRank][0] + '\t' + paramName + '\t'\
                      'step:' + str(step) + '\t bestfit:' + str(bestfit)
             destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
             chartname = savechartfile('mvtchart', destdir, txtchart, comment)
             print "... chart file {} saved".format(chartname)
             # if previous_bestfit < 1000:
             deltaStim = deltaStim * 2.5
-            if deltaStim > maxDeltaStim:
-                deltaStim = maxDeltaStim
+            if deltaStim > optSet.maxDeltaStim:
+                deltaStim = optSet.maxDeltaStim
         previous_bestfit = bestfit
         # previous_bestfitcoact = bestfitCoact
         step = step+1
     return [bestvalue, bestfit, deltaStim, bestfitCoact, chartname]
 
 
-def runThreeSynTests(folders, model, projMan, simSet, synRank, paramSynName,
-                     Connexions, tab_connexions,
-                     listeNeurons, listeNeuronsFR,
-                     mvtcolumn, mnCol, rate, lineStart, lineEnd,
-                     rang, step, trial, epoch,
-                     multSyn, maxMultSyn, limits, limQuality,
-                     activThr, coactivityFactor,
-                     initialSynvalue, bestsynfit, bestsynfitCoact,
-                     template):
-    maxSynAmp, maxG, maxWeight = limits[1], limits[2], limits[3]
+def runThreeSynTests(folders, model, optSet, projMan, simSet,
+                     paramSynName, synRank, rang, step, trial, epoch,
+                     multSyn, initialSynvalue, template,
+                     bestsynfit, bestsynfitCoact):
+
+    """
+         folders, model, optSet, projMan, simSet,
+         synRank,
+         Connexions, tab_connexions,
+         listeNeurons, listeNeuronsFR,
+         mvtcolumn, mnCol, rate, lineStart, lineEnd,
+         rang, step, trial, epoch,
+         multSyn, maxMultSyn, limits, limQuality,
+         activThr, coactivityFactor,
+         initialSynvalue, bestsynfit, bestsynfitCoact,
+         template):
+    """
+    maxSynAmp = optSet.limits[1]
+    maxG, maxWeight = optSet.limits[2], optSet.limits[3]
     if paramSynName == "Weight":
         firstConnexion = findFirstType(model, "SynapsesFR")
     else:
@@ -1530,7 +1623,7 @@ def runThreeSynTests(folders, model, projMan, simSet, synRank, paramSynName,
                 model.lookup["Name"][synRank + firstConnexion] + "." +
                 paramSynName: [value_minus, value_plus, value_base]})
         else:
-            simSet.set_by_range({tab_connexions[synRank][0] + "." +
+            simSet.set_by_range({optSet.tab_connexions[synRank][0] + "." +
                                  paramSynName: [value_minus, value_plus,
                                                 value_base]})
     else:
@@ -1539,22 +1632,22 @@ def runThreeSynTests(folders, model, projMan, simSet, synRank, paramSynName,
                 model.lookup["Name"][synRank + firstConnexion] + "." +
                 paramSynName: [value_minus, value_plus]})
         else:
-            simSet.set_by_range({tab_connexions[synRank][0] + "." +
+            simSet.set_by_range({optSet.tab_connexions[synRank][0] + "." +
                                 paramSynName: [value_minus, value_plus]})
 
     message = "\nEpoch {}; Trial {}; Param {}; STEP {}; multSyn ={}"
     if paramSynName != 'G':
         print message.format(epoch, trial, rang, step, multSyn)
     if paramSynName == 'G':
-        SourceID = Connexions[synRank].find("SourceID").text
-        TargetID = Connexions[synRank].find("TargetID").text
+        SourceID = optSet.Connexions[synRank].find("SourceID").text
+        TargetID = optSet.Connexions[synRank].find("TargetID").text
         SourceName = model.getElementByID(SourceID).find('Name').text
         TargetName = model.getElementByID(TargetID).find('Name').text
         message += "; source = {}; target = {}"
         print message.format(epoch, trial, rang, step, multSyn,
                              SourceName, TargetName)
     elif paramSynName == 'Weight':
-        tab_connexionsFR = affichConnexionsFR(model, Connexions, 0)
+        tab_connexionsFR = affichConnexionsFR(model, optSet.Connexions, 0)
         SourceName = tab_connexionsFR[synRank][3]
         TargetName = tab_connexionsFR[synRank][4]
         message += "; source = {}; target = {}"
@@ -1566,15 +1659,20 @@ def runThreeSynTests(folders, model, projMan, simSet, synRank, paramSynName,
     projMan.make_asims(simSet)
     projMan.run(cores=-1)
     # reading of the result files and storing in tables
-    res = comparetests(folders, step, value_base, value_minus, value_plus,
-                       mvtcolumn, mnCol, listeNeurons, listeNeuronsFR,
-                       lineStart, lineEnd, template,
-                       activThr, coactivityFactor,
-                       bestsynfit, bestsynfitCoact, limQuality, rang)
+    res = comparetests(folders, model, optSet, step,
+                       value_base, value_minus, value_plus,
+                       template,
+                       bestsynfit, bestsynfitCoact, rang)
     return res
 
 
-def improveSynparam(folders, model, projMan, simSet, synRank, paramSynName,
+def improveSynparam(folders, model, optSet, projMan, simSet,
+                    paramSynName, synRank, rang, trial, epoch,
+                    multSyn, initialSynvalue, template,
+                    bestsynfit, bestsynfitCoact):
+    """
+        folders, model, optSet,  projMan, simSet,
+                    synRank, paramSynName,
                     Connexions, tab_connexions,
                     listeNeurons, listeNeuronsFR,
                     mvtcolumn, mnCol, rate,
@@ -1583,28 +1681,24 @@ def improveSynparam(folders, model, projMan, simSet, synRank, paramSynName,
                     activThr, coactivityFactor,
                     initialSynvalue, template, nbsteps,
                     bestsynfit, bestsynfitCoact):
+    """
 
     previous_bestsynfit = bestsynfit
     bestsynvalue = 0
     step = 0
     chartname = ""
-    while step < nbsteps:
+    while step < optSet.nbsteps:
         # multSynval = abs(initialSynvalue) * multSyn    # width of the test
-        result = runThreeSynTests(folders, model, projMan, simSet,
-                                  synRank, paramSynName,
-                                  Connexions, tab_connexions,
-                                  listeNeurons, listeNeuronsFR,
-                                  mvtcolumn, mnCol, rate, lineStart, lineEnd,
-                                  rang, step, trial, epoch,
-                                  multSyn, maxMultSyn, limits, limQuality,
-                                  activThr, coactivityFactor,
-                                  initialSynvalue, bestsynfit, bestsynfitCoact,
-                                  template)
+        result = runThreeSynTests(folders, model, optSet, projMan, simSet,
+                                  paramSynName, synRank, rang,
+                                  step, trial, epoch,
+                                  multSyn, initialSynvalue, template,
+                                  bestsynfit, bestsynfitCoact)
         bestsynvalue, bestsynfit, stop = result[0], result[1], result[2]
         txtchart, bestsynfitCoact = result[3], result[4]
         if stop:
             print "ineffective parameter => abandon improving"
-            step = nbsteps  # stop trying improvement with this param
+            step = optSet.nbsteps  # stop trying improvement with this param
         # sets the new configuration
         initialSynvalue = bestsynvalue
         print "best fit = {}; best value = {}".format(bestsynfit, bestsynvalue)
@@ -1615,70 +1709,64 @@ def improveSynparam(folders, model, projMan, simSet, synRank, paramSynName,
         else:
             # chartfile is saved only if there were an improvement
 
-            comment = tab_connexions[synRank][0] + '\t' + paramSynName +\
-                      '\t step:' + str(step) +\
-                      '\t bestsynfit:' + str(bestsynfit)
+            comment = optSet.tab_connexions[synRank][0] + '\t' +\
+                paramSynName + '\t step:' + str(step) +\
+                '\t bestsynfit:' + str(bestsynfit)
             destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
             chartname = savechartfile('mvtchart', destdir, txtchart, comment)
             print "... chart file {} saved".format(chartname)
             # if previous_bestsynfit < 1000:
             multSyn = multSyn * 2.5
-            if multSyn > maxMultSyn:
-                multSyn = maxMultSyn
+            if multSyn > optSet.maxMultSyn:
+                multSyn = optSet.maxMultSyn
         previous_bestsynfit = bestsynfit
         step = step+1
     return [bestsynvalue, bestsynfit, multSyn, bestsynfitCoact, chartname]
 
 
-def runImproveStims(folders, model, projMan, allPhasesStim,
-                    ExternalStimuli, seriesStimParam,
-                    mvtcolumn, mnCol, rate,
-                    nbtrials, nbsteps, epoch,
-                    listeNeurons, listeNeuronsFR,
-                    deltaStimCoeff, limQuality, maxDeltaStim,
-                    activThr, coactivityFactor,
-                    limits, defaultval):
+def runImproveStims(folders, model, optSet, projMan, epoch):
     Stim = []
     shStim = []
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet object
     # mvtTemplate = allPhasesStim[4]
-    tab_stims = affichExtStim(ExternalStimuli, 1)
-    for phase in range(len(allPhasesStim)):
-        Stim.append(allPhasesStim[phase][0])
-        shStim.append(allPhasesStim[phase][1])
+    tab_stims = affichExtStim(optSet.ExternalStimuli, 1)
+    for phase in range(len(optSet.allPhasesStim)):
+        Stim.append(optSet.allPhasesStim[phase][0])
+        shStim.append(optSet.allPhasesStim[phase][1])
     print "epoch", epoch, "Stims", Stim
     print "ShuffledOrder", shStim
-    for trial in range(nbtrials):
+    for trial in range(optSet.nbstimtrials):
         deltaStimCo = chargeBestParams(folders, "stimcoeff.txt",
-                                       deltaStimCoeff,
-                                       allPhasesStim,
-                                       seriesStimParam)
+                                       optSet.deltaStimCoeff,
+                                       optSet.allPhasesStim,
+                                       optSet.seriesStimParam)
         #  If file exists, loads ...
         #  but if no such file, then creates deltaStimCo vlaues
         bestStimfits = chargeBestParams(folders, "stimbestfits.txt",
-                                        defaultval,
-                                        allPhasesStim,
-                                        seriesStimParam)
+                                        optSet.defaultval,
+                                        optSet.allPhasesStim,
+                                        optSet.seriesStimParam)
         bestStimCoact = chargeBestParams(folders, "stimbestfitsCoact.txt",
-                                         defaultval,
-                                         allPhasesStim,
-                                         seriesStimParam)
+                                         optSet.defaultval,
+                                         optSet.allPhasesStim,
+                                         optSet.seriesStimParam)
         bestfitPhase, bestCoaPhase = [], []
-        nbPhases = len(allPhasesStim)
+        nbPhases = len(optSet.allPhasesStim)
         for i in range(nbPhases):
             bestfitTemp = bestStimfits[(i+1)*(len(bestStimfits)/nbPhases)-1]
             bestCoaTemp = bestStimCoact[(i+1)*(len(bestStimCoact)/nbPhases)-1]
             bestfitPhase.append(bestfitTemp)
             bestCoaPhase.append(bestCoaTemp)
         bestvals = chargeParamValues(folders, "stimbestvalues.txt",
-                                     allPhasesStim,
-                                     seriesStimParam, ExternalStimuli)
-        nbparam = len(seriesStimParam)
+                                     optSet.allPhasesStim,
+                                     optSet.seriesStimParam,
+                                     optSet.ExternalStimuli)
+        nbparam = len(optSet.seriesStimParam)
 
         shuffled_rang = []
-        for phase in range(len(allPhasesStim)):
+        for phase in range(len(optSet.allPhasesStim)):
             [stims, shuffledstims,
-             lineStart, lineEnd, template] = allPhasesStim[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesStim[phase]
             k = len(stims) * nbparam * phase
             print k
             for i in range(len(stims)):
@@ -1686,39 +1774,32 @@ def runImproveStims(folders, model, projMan, allPhasesStim,
                     shuffled_rang.append(shuffledstims[i] * nbparam + j + k)
 
         rang = 0
-        for phase in range(len(allPhasesStim)):
+        for phase in range(len(optSet.allPhasesStim)):
             bestfit = bestfitPhase[phase]
             bestfitCoact = bestCoaPhase[phase]
             [stims, shuffledstims,
-             lineStart, lineEnd, template] = allPhasesStim[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesStim[phase]
             for stim in range(len(stims)):
                 stimRank = stims[shuffledstims[stim]]
-                for param in range(len(seriesStimParam)):
+                for param in range(len(optSet.seriesStimParam)):
                     # print rang
-                    paramName = seriesStimParam[param]
+                    paramName = optSet.seriesStimParam[param]
                     deltaStim = deltaStimCo[shuffled_rang[rang]]
                     # choose initial value of the parameter to be improved
-                    initialvalue = float(ExternalStimuli[stimRank].
+                    initialvalue = float(optSet.ExternalStimuli[stimRank].
                                          find(paramName).text)
-                    # if paramName == 'CurrentOn':
-                    #    if initialvalue == 0:
-                    #        initialvalue = 1e-11  # to avoid being trapped
+                    if paramName == 'CurrentOn':
+                        if initialvalue == 0:
+                            initialvalue = 1e-11  # to avoid being trapped
                     i = 0
-                    if nbsteps > 0:
-                        result = improveStimparam(folders, model,
+                    if optSet.nbsteps > 0:
+                        result = improveStimparam(folders, model, optSet,
                                                   projMan, simSet,
-                                                  stimRank, paramName,
-                                                  ExternalStimuli, tab_stims,
-                                                  listeNeurons, listeNeuronsFR,
-                                                  mvtcolumn, mnCol, rate,
-                                                  lineStart, lineEnd,
+                                                  paramName, stimRank,
                                                   rang, trial, epoch,
-                                                  deltaStim, maxDeltaStim,
-                                                  limits, limQuality,
-                                                  activThr, coactivityFactor,
+                                                  deltaStim,
                                                   initialvalue,
                                                   template,
-                                                  nbsteps,
                                                   bestfit,
                                                   bestfitCoact)
                         bestvalue, bestfit = result[0], result[1]
@@ -1729,7 +1810,7 @@ def runImproveStims(folders, model, projMan, allPhasesStim,
                         else:
                             savedchartname = ""
                         # Change the value of the property:
-                        ExternalStimuli[stimRank].\
+                        optSet.ExternalStimuli[stimRank].\
                             find(paramName).text = str(bestvalue)
                         # Save the specific deltaStim coeffs modified
                         deltaStimCo[shuffled_rang[rang]] = deltaStim
@@ -1753,7 +1834,7 @@ def runImproveStims(folders, model, projMan, allPhasesStim,
                     rang = rang + 1
                     # After changing a property, save the updated model
                     model.saveXML(overwrite=True)   # in the FinalModel dir
-                    tab_stims = affichExtStim(ExternalStimuli, 0)
+                    tab_stims = affichExtStim(optSet.ExternalStimuli, 0)
         writeBestResSuite(folders, "stimbestvaluesSuite.txt", bestvals, 0)
         writeBestResSuite(folders, "stimbestfitsSuite.txt", bestStimfits, 0)
         writeBestResSuite(folders, "stimbestfitsCoactSuite.txt",
@@ -1765,40 +1846,33 @@ def runImproveStims(folders, model, projMan, allPhasesStim,
                            savedchartname, bestfit)
 
 
-def runImproveSynapses(folders, model, projMan, allPhasesSyn,
-                       Connexions, seriesSynParam,
-                       mvtcolumn, mnCol, rate,
-                       nbtrials, nbsteps, epoch,
-                       listeNeurons, listeNeuronsFR,
-                       multSynCoeff, limQuality, maxMultSyn,
-                       activThr, coactivityFactor,
-                       limits, defaultval):
+def runImproveSynapses(folders, model, optSet, projMan, epoch):
     Syn = []
     shSyn = []
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet obj
-    tab_connexions = affichConnexions(model, Connexions, 1)  # idem
-    for phase in range(len(allPhasesSyn)):
-        Syn.append(allPhasesSyn[phase][0])
-        shSyn.append(allPhasesSyn[phase][1])
+    tab_connexions = affichConnexions(model, optSet.Connexions, 1)  # idem
+    for phase in range(len(optSet.allPhasesSyn)):
+        Syn.append(optSet.allPhasesSyn[phase][0])
+        shSyn.append(optSet.allPhasesSyn[phase][1])
     print "epoch", epoch, "Syn", Syn
     print "Shuffled Order", shSyn
-    for trial in range(nbtrials):
+    for trial in range(optSet.nbsyntrials):
         deltaSynCo = chargeBestParams(folders, "syncoeff.txt",
-                                      multSynCoeff,
-                                      allPhasesSyn,
-                                      seriesSynParam)
+                                      optSet.multSynCoeff,
+                                      optSet.allPhasesSyn,
+                                      optSet.seriesSynParam)
         #  If file exists, loads ...
         #  but if no such file, then creates deltaSynCo vlaues
         bestSynfits = chargeBestParams(folders, "synbestfits.txt",
-                                       defaultval,
-                                       allPhasesSyn,
-                                       seriesSynParam)
+                                       optSet.defaultval,
+                                       optSet.allPhasesSyn,
+                                       optSet.seriesSynParam)
         bestSynCoact = chargeBestParams(folders, "synbestfitsCoact.txt",
-                                        defaultval,
-                                        allPhasesSyn,
-                                        seriesSynParam)
+                                        optSet.defaultval,
+                                        optSet.allPhasesSyn,
+                                        optSet.seriesSynParam)
         bestSynfitPhase, bestSynCoaPhase = [], []
-        nbPhases = len(allPhasesSyn)
+        nbPhases = len(optSet.allPhasesSyn)
         for i in range(nbPhases):
             bestSynTemp = bestSynfits[(i+1)*(len(bestSynfits)/nbPhases)-1]
             bestCoaTemp = bestSynCoact[(i+1)*(len(bestSynCoact)/nbPhases)-1]
@@ -1806,14 +1880,15 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
             bestSynCoaPhase.append(bestCoaTemp)
         bestSynvals = chargeBestSynValues(folders, model,
                                           "synbestvalues.txt",
-                                          Connexions, allPhasesSyn,
-                                          seriesSynParam)
-        nbparam = len(seriesSynParam)
+                                          optSet.Connexions,
+                                          optSet.allPhasesSyn,
+                                          optSet.seriesSynParam)
+        nbparam = len(optSet.seriesSynParam)
 
         shuffled_rang = []
-        for phase in range(len(allPhasesSyn)):
+        for phase in range(len(optSet.allPhasesSyn)):
             [syns, shuffledsyns,
-             lineStart, lineEnd, template] = allPhasesSyn[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesSyn[phase]
             k = len(syns) * nbparam * phase
             print k
             for i in range(len(syns)):
@@ -1824,11 +1899,11 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
         synapseSynAmp = []
         synapseThr = []
         synapseG = []
-        for i in range(len(Connexions)):
-            synapseTempID = Connexions[i].find("SynapseTypeID").text
+        for i in range(len(optSet.Connexions)):
+            synapseTempID = optSet.Connexions[i].find("SynapseTypeID").text
             synapseTempType = model.getElementByID(synapseTempID).\
                 find("Type").text
-            g = Connexions[i].find("G").text
+            g = optSet.Connexions[i].find("G").text
             if synapseTempType == "NonSpikingChemical":
                 amp = model.getElementByID(synapseTempID).\
                     find("SynAmp").text
@@ -1845,18 +1920,18 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
             # print i, synapseTempID, synapseTempType, g, amp
 
         rang = 0
-        for phase in range(len(allPhasesSyn)):
+        for phase in range(len(optSet.allPhasesSyn)):
             bestsynfit = bestSynfitPhase[phase]
             bestsynfitCoact = bestSynCoaPhase[phase]
             [syns, shuffledsyns,
-             lineStart, lineEnd, template] = allPhasesSyn[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesSyn[phase]
             for syn in range(len(syns)):
                 synRank = syns[shuffledsyns[syn]]
-                for synparam in range(len(seriesSynParam)):
+                for synparam in range(len(optSet.seriesSynParam)):
                     # print rang
-                    paramSynName = seriesSynParam[synparam]
+                    paramSynName = optSet.seriesSynParam[synparam]
                     multSyn = deltaSynCo[shuffled_rang[rang]]
-                    synapseTempID = Connexions[synRank].\
+                    synapseTempID = optSet.Connexions[synRank].\
                         find("SynapseTypeID").text
 
                     # choose the name of parameter adapted to synapse type
@@ -1872,7 +1947,7 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
                     # ------------------------------------------------------
 
                     if paramSynName == "G":
-                        val = Connexions[synRank].find("G").text
+                        val = optSet.Connexions[synRank].find("G").text
                     else:
                         val = model.getElementByID(synapseTempID).\
                             find(paramSynName).text
@@ -1881,21 +1956,14 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
                         if initialSynvalue == 0:
                             initialSynvalue = 0.0001  # to avoid being trapped
                     i = 0
-                    if nbsteps > 0:
-                        result = improveSynparam(folders, model,
+                    if optSet.nbsteps > 0:
+                        result = improveSynparam(folders, model, optSet,
                                                  projMan, simSet,
-                                                 synRank, paramSynName,
-                                                 Connexions, tab_connexions,
-                                                 listeNeurons, listeNeuronsFR,
-                                                 mvtcolumn, mnCol, rate,
-                                                 lineStart, lineEnd,
+                                                 paramSynName, synRank,
                                                  rang, trial, epoch,
-                                                 multSyn, maxMultSyn,
-                                                 limits, limQuality,
-                                                 activThr, coactivityFactor,
+                                                 multSyn,
                                                  initialSynvalue,
                                                  template,
-                                                 nbsteps,
                                                  bestsynfit,
                                                  bestsynfitCoact)
                         bestSynvalue, bestsynfit = result[0], result[1]
@@ -1908,7 +1976,7 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
                             savedchartname = ""
                         # Change the value of the property:
                         if paramSynName == "G":
-                            Connexions[synRank].\
+                            optSet.Connexions[synRank].\
                                 find("G").text = str(bestSynvalue)
                         else:
                             model.getElementByID(synapseTempID).\
@@ -1931,7 +1999,8 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
                     rang = rang + 1
                     # After changing a property, save the updated model
                     model.saveXML(overwrite=True)   # in the FinalModel dir
-                    tab_connexions = affichConnexions(model, Connexions, 0)
+                    tab_connexions = affichConnexions(model,
+                                                      optSet.Connexions, 0)
         writeBestResSuite(folders, "synbestvaluesSuite.txt", bestSynvals, 0)
         writeBestResSuite(folders, "synbestfitsSuite.txt", bestSynfits, 0)
         writeBestResSuite(folders, "synbestfitsCoactSuite.txt",
@@ -1943,40 +2012,33 @@ def runImproveSynapses(folders, model, projMan, allPhasesSyn,
                            trial, savedchartname, bestsynfit)
 
 
-def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
-                         SynapsesFR, seriesSynFRParam,
-                         mvtcolumn, mnCol, rate,
-                         nbtrials, nbsteps, epoch,
-                         listeNeurons, listeNeuronsFR,
-                         multSynCoeff, limQuality, maxMultSyn,
-                         activThr, coactivityFactor,
-                         limits, defaultval):
+def runImproveSynapsesFR(folders, model, optSet, projMan, epoch):
     SynFR = []
     shSynFR = []
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet obj
-    tab_connexionsFR = affichConnexionsFR(model, SynapsesFR, 1)  # idem
-    for phase in range(len(allPhasesSynFR)):
-        SynFR.append(allPhasesSynFR[phase][0])
-        shSynFR.append(allPhasesSynFR[phase][1])
+    tab_connexionsFR = affichConnexionsFR(model, optSet.SynapsesFR, 1)  # idem
+    for phase in range(len(optSet.allPhasesSynFR)):
+        SynFR.append(optSet.allPhasesSynFR[phase][0])
+        shSynFR.append(optSet.allPhasesSynFR[phase][1])
     print "epoch", epoch, "SynFR", SynFR
     print "Shuffled Order", shSynFR
-    for trial in range(nbtrials):
+    for trial in range(optSet.nbsyntrials):
         deltaSynFRCo = chargeBestParams(folders, "synFRcoeff.txt",
-                                        multSynCoeff,
-                                        allPhasesSynFR,
-                                        seriesSynFRParam)
+                                        optSet.multSynCoeff,
+                                        optSet.allPhasesSynFR,
+                                        optSet.seriesSynFRParam)
         #  If file exists, loads ...
         #  but if no such file, then creates deltaSynFRCo vlaues
         bestSynFRfits = chargeBestParams(folders, "synFRbestfits.txt",
-                                         defaultval,
-                                         allPhasesSynFR,
-                                         seriesSynFRParam)
+                                         optSet.defaultval,
+                                         optSet.allPhasesSynFR,
+                                         optSet.seriesSynFRParam)
         bestSynFRCoac = chargeBestParams(folders, "synFRbestfitsCoact.txt",
-                                         defaultval,
-                                         allPhasesSynFR,
-                                         seriesSynFRParam)
+                                         optSet.defaultval,
+                                         optSet.allPhasesSynFR,
+                                         optSet.seriesSynFRParam)
         bestSynFRfitPhase, bestSynFRCoacPhase = [], []
-        nbPhases = len(allPhasesSynFR)
+        nbPhases = len(optSet.allPhasesSynFR)
         for i in range(nbPhases):
             bestSynTemp = bestSynFRfits[(i+1)*(len(bestSynFRfits)/nbPhases)-1]
             bestCoaTemp = bestSynFRCoac[(i+1)*(len(bestSynFRCoac)/nbPhases)-1]
@@ -1984,14 +2046,15 @@ def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
             bestSynFRCoacPhase.append(bestCoaTemp)
         bestSynvals = chargeBestSynValues(folders, model,
                                           "synFRbestvalues.txt",
-                                          SynapsesFR, allPhasesSynFR,
-                                          seriesSynFRParam)
-        nbparam = len(seriesSynFRParam)
+                                          optSet.SynapsesFR,
+                                          optSet.allPhasesSynFR,
+                                          optSet.seriesSynFRParam)
+        nbparam = len(optSet.seriesSynFRParam)
 
         shuffled_rang = []
-        for phase in range(len(allPhasesSynFR)):
+        for phase in range(len(optSet.allPhasesSynFR)):
             [syns, shuffledsyns,
-             lineStart, lineEnd, template] = allPhasesSynFR[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesSynFR[phase]
             k = len(syns) * nbparam * phase
             print k
             for i in range(len(syns)):
@@ -2001,23 +2064,23 @@ def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
         # reads all syn parameters values from the .asim file in FinalModel
         synapseWeight = []
 
-        for i in range(len(SynapsesFR)):
-            synapseTempWeight = SynapsesFR[i].find("Weight").text
+        for i in range(len(optSet.SynapsesFR)):
+            synapseTempWeight = optSet.SynapsesFR[i].find("Weight").text
             synapseWeight.append(synapseTempWeight)
 
         rang = 0
-        for phase in range(len(allPhasesSynFR)):
+        for phase in range(len(optSet.allPhasesSynFR)):
             bestsynfit = bestSynFRfitPhase[phase]
             bestsynfitCoact = bestSynFRCoacPhase[phase]
             [syns, shuffledsyns,
-             lineStart, lineEnd, template] = allPhasesSynFR[phase]
+             lineStart, lineEnd, template] = optSet.allPhasesSynFR[phase]
             for syn in range(len(syns)):
                 synRank = syns[shuffledsyns[syn]]
-                for synparam in range(len(seriesSynFRParam)):
+                for synparam in range(len(optSet.seriesSynFRParam)):
                     # print rang
-                    paramSynName = seriesSynFRParam[synparam]
+                    paramSynName = optSet.seriesSynFRParam[synparam]
                     multSyn = deltaSynFRCo[shuffled_rang[rang]]
-                    synapseTempID = SynapsesFR[synRank].find("ID").text
+                    synapseTempID = optSet.SynapsesFR[synRank].find("ID").text
                     val = model.getElementByID(synapseTempID).\
                         find(paramSynName).text
                     initialSynvalue = float(val)
@@ -2026,23 +2089,17 @@ def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
                         if initialSynvalue == 0:
                             initialSynvalue = 1e-0012
                     i = 0
-                    if nbsteps > 0:
-                        result = improveSynparam(folders, model,
+                    if optSet.nbsteps > 0:
+                        result = improveSynparam(folders, model, optSet,
                                                  projMan, simSet,
-                                                 synRank, paramSynName,
-                                                 SynapsesFR, tab_connexionsFR,
-                                                 listeNeurons, listeNeuronsFR,
-                                                 mvtcolumn, mnCol, rate,
-                                                 lineStart, lineEnd,
+                                                 paramSynName, synRank,
                                                  rang, trial, epoch,
-                                                 multSyn, maxMultSyn,
-                                                 limits, limQuality,
-                                                 activThr, coactivityFactor,
+                                                 multSyn,
                                                  initialSynvalue,
                                                  template,
-                                                 nbsteps,
                                                  bestsynfit,
                                                  bestsynfitCoact)
+
                         bestSynvalue, bestsynfit = result[0], result[1]
                         multSyn = result[2]
                         coact, chartname = result[3], result[4]
@@ -2070,7 +2127,8 @@ def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
                     rang = rang + 1
                     # After changing a property, save the updated model
                     model.saveXML(overwrite=True)   # in the FinalModel dir
-                    tab_connexionsFR = affichConnexionsFR(model, SynapsesFR, 0)
+                    tab_connexionsFR = affichConnexionsFR(model,
+                                                          optSet.SynapsesFR, 0)
         writeBestResSuite(folders, "synFRbestvaluesSuite.txt", bestSynvals, 0)
         writeBestResSuite(folders, "synFRbestfitsSuite.txt", bestSynFRfits, 0)
         writeBestResSuite(folders, "synFRbestfitsCoactSuite.txt",
@@ -2083,74 +2141,33 @@ def runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
                            trial, savedchartname, bestsynfit)
 
 
-def improveSynapses(folders, model, projMan, allPhasesSyn,
-                    Connexions, seriesSynParam,
-                    mvtcolumn, mnCol, rate,
-                    nbtrials, nbsteps, epoch,
-                    listeNeurons, listeNeuronsFR,
-                    multSynCoeff, limQuality, maxMultSyn,
-                    activThr, coactivityFactor,
-                    limits, defaultval):
+def improveSynapses(folders, model, optSet, projMan, epoch):
     print "\n\n"
     print "==================="
     print "improving synapses"
-    if len(allPhasesSyn[0][0]) > 0:  # list of connexions to be improved
-        runImproveSynapses(folders, model, projMan, allPhasesSyn,
-                           Connexions, seriesSynParam,
-                           mvtcolumn, mnCol, rate,
-                           nbtrials, nbsteps, epoch,
-                           listeNeurons, listeNeuronsFR,
-                           multSynCoeff, limQuality, maxMultSyn,
-                           activThr, coactivityFactor,
-                           limits, defaultval)
+    if len(optSet.allPhasesSyn[0][0]) > 0:  # list of connexions to be improved
+        runImproveSynapses(folders, model, optSet, projMan, epoch)
     else:
         print "no connexion between 'voltage neurons' detected"
 
 
-def improveSynapsesFR(folders, model, projMan, allPhasesSynFR,
-                      SynapsesFR, seriesSynFRParam,
-                      mvtcolumn, mnCol, rate,
-                      nbtrials, nbsteps, epoch,
-                      listeNeurons, listeNeuronsFR,
-                      multSynCoeff, limQuality, maxMultSyn,
-                      activThr, coactivityFactor,
-                      limits, defaultval):
+def improveSynapsesFR(folders, model, optSet, projMan, epoch):
     print "\n\n"
     print "====================="
     print "improving synapsesFR"
-    if len(allPhasesSynFR[0][0]) > 0:  # list of connexionsFR to be improved
-        runImproveSynapsesFR(folders, model, projMan, allPhasesSynFR,
-                             SynapsesFR, seriesSynFRParam,
-                             mvtcolumn, mnCol, rate,
-                             nbtrials, nbsteps, epoch,
-                             listeNeurons, listeNeuronsFR,
-                             multSynCoeff, limQuality, maxMultSyn,
-                             activThr, coactivityFactor,
-                             limits, defaultval)
+    if len(optSet.allPhasesSynFR[0][0]) > 0:
+        # list of connexionsFR to be improved
+        runImproveSynapsesFR(folders, model, optSet, projMan, epoch)
     else:
         print "no connexion between 'Firing Rate neurons' detected"
 
 
-def improveStims(folders, model, projMan, allPhasesStim,
-                 ExternalStimuli, seriesStimParam,
-                 mvtcolumn, mnCol, rate,
-                 nbtrials, nbsteps, epoch,
-                 listeNeurons, listeNeuronsFR,
-                 deltaStimCoeff, limQuality, maxDeltaStim,
-                 activThr, coactivityFactor,
-                 limits, defaultval):
+def improveStims(folders, model, optSet, projMan, epoch):
     print "\n\n"
     print "========================"
     print "improving External Stim"
-    if len(allPhasesStim[0][0]) > 0:  # list of external stimuli
-        runImproveStims(folders, model, projMan, allPhasesStim,
-                        ExternalStimuli, seriesStimParam,
-                        mvtcolumn, mnCol, rate,
-                        nbtrials, nbsteps, epoch,
-                        listeNeurons, listeNeuronsFR,
-                        deltaStimCoeff, limQuality, maxDeltaStim,
-                        activThr, coactivityFactor,
-                        limits, defaultval)
+    if len(optSet.allPhasesStim[0][0]) > 0:  # list of external stimuli
+        runImproveStims(folders, model, optSet, projMan, epoch)
     else:
         print "no 'External stimulus' detected"
 
@@ -2158,11 +2175,146 @@ def improveStims(folders, model, projMan, allPhasesStim,
 ###########################################################################
 #                           CMAe procedures
 ###########################################################################
+def affichParamLimits(sParName, vallower, valupper, valx0, deb):
+    for st, sName in enumerate(sParName):
+        txt1 = ""
+        for sp in range(4-((len(sName)+0)/8)):
+            txt1 += "\t"
+        low = str(vallower[st + deb])
+        upp = str(valupper[st + deb])
+        # mid = 0.5 * (vallower[st + deb] + valupper[st + deb])
+        lowsp = ""
+        for sp in range(3-((len(low)+1)/8)):
+            lowsp += "\t"
+        uppsp = ""
+        for sp in range(3-((len(upp)+5)/8)):
+            uppsp += "\t"
+        valrange = str("[" + low + lowsp + ",    " + upp + uppsp + "]")
+        # limst = sName + txt1 + valrange + "\t"
+        # txt2 = "\t"
+        # for sp in range(3-((len(str(mid))+0)/8)):
+        #     txt2 += "\t"
+        print (sName + txt1 + valrange + "\t" + str(valx0[st + deb]))
+        # + txt2 + str(mid))
+
+
+def runSimMvt(folders, model, optSet, projMan,
+              x, chartRootName, fitValFileName, affiche):
+    simSet = SimulationSet.SimulationSet()
+    stimParName = optSet.stimParName
+    synParName = optSet.synParName
+    for st in range(len(stimParName)):
+        val = x[st]*(optSet.realupper[st] - optSet.reallower[st]) +\
+                     optSet.reallower[st]
+        simSet.set_by_range({stimParName[st]: [val]})
+    for sy in range(len(synParName)):
+        val = (x[st+1+sy]*(optSet.realupper[st+1+sy] -
+                           optSet.reallower[st+1+sy]) +
+               optSet.reallower[st+1+sy])
+        simSet.set_by_range({synParName[sy]: [val]})
+    if affiche == 1:
+        print simSet.samplePts
+    projMan.make_asims(simSet)
+    projMan.run(cores=-1)
+    tab = tablo(folders, findTxtFileName(model, optSet, 1))
+    quality = testquality(folders, optSet, tab, optSet.template, "")
+    [mse, coactpenality, coact] = quality
+    # destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
+    # err = mse+coactpenality
+    # txt = "err:{:4.4f}; mse:{:4.4f}; coactpenality:{}; coact:{:4.8f}"
+    # comment = txt.format(err, mse, coactpenality, coact)
+    # chartname = savechartfile(chartRootName, destdir, tab, comment)
+    # print "... chart file {} saved; {}".format(chartname, comment)
+    # trial = chartname[0:chartname.find(".")]
+    trial = str(simNb)
+    res = [trial, mse+coactpenality, mse, coactpenality, coact]
+    writeBestResSuite(folders, fitValFileName, res, 0)
+    return res
+
+
+def runCMAe(folders, model, optSet, projMan, nbevals):
+    global procedure, simNb
+    procedure = "runCMAe"
+    simNb = 0
+
+    def f(x):
+        global simNb
+        res = runSimMvt(folders, model, optSet, projMan,
+                        x, 'CMAeChart', "CMAefitCourse.txt", 0)
+        valeurs = [simNb]
+        for i in range(len(x)):
+            valeurs.append(x[i])
+        writeBestResSuite(folders, "CMAeXValues.txt", valeurs, 0)
+        simNb += 1
+        if fmod(simNb, 10) == 0.0:
+            print
+        err = res[1]
+        return err
+
+    def improve(nbevals, adj_cmaes_sigma):
+        stimParName = optSet.stimParName
+        synParName = optSet.synParName
+        # ===================================================================
+        res = fmin(f, optSet.x0, adj_cmaes_sigma,
+                   options={'bounds': [optSet.lower, optSet.upper],
+                            'verb_log': 3,
+                            'verb_disp': True,
+                            'maxfevals': nbevals,
+                            'seed': 0})
+        # ===================================================================
+        x = res[0]
+        # once all nbevals tests are done...
+        # ... save the best asim file in simFiles directory
+        simSet = SimulationSet.SimulationSet()
+        for st in range(len(stimParName)):
+            val = x[st]*(optSet.realupper[st] - optSet.reallower[st]) +\
+                   optSet.reallower[st]
+            simSet.set_by_range({stimParName[st]: [val]})
+        for sy in range(len(synParName)):
+            val = (x[st+1+sy]*(optSet.realupper[st+1+sy] -
+                               optSet.reallower[st+1+sy]) +
+                   optSet.reallower[st+1+sy])
+            simSet.set_by_range({synParName[sy]: [val]})
+        print simSet.samplePts
+        projMan.make_asims(simSet)
+        # Copy sim file from "SimFiles" to "CMAeBestSimFiles" directory
+        destdir = folders.animatlab_rootFolder + "CMAeBestSimFiles/"
+        sourcedir = folders.animatlab_simFiles_dir
+        # simFileName = findChartName(folders.animatlab_commonFiles_dir)[0]
+        simFileName = (os.path.split(model.asimFile)[-1]).split(".")[-2]
+        filesource = simFileName + "-1.asim"
+        filedest = simFileName + ".asim"
+        comment = ""
+        copyRenameFile(sourcedir, filesource, destdir, filedest, comment)
+        return [res, simSet]
+
+    adj_cmaes_sigma = min(optSet.upper)*optSet.cmaes_sigma
+    comment = ["trial", "eval", "mse", "coactpenality", "coact"]
+    writeBestResSuite(folders, "CMAeFitCourse.txt", comment, 1)
+    deb = 0
+    affichParamLimits(optSet.stimParName, optSet.reallower,
+                      optSet.realupper, optSet.realx0, deb)
+    deb = len(optSet.stimParName)
+    affichParamLimits(optSet.synParName, optSet.reallower,
+                      optSet.realupper, optSet.realx0, deb)
+    print
+    deb = 0
+    affichParamLimits(optSet.stimParName, optSet.lower,
+                      optSet.upper, optSet.x0, deb)
+    deb = len(optSet.stimParName)
+    affichParamLimits(optSet.synParName, optSet.lower,
+                      optSet.upper, optSet.x0, deb)
+    ##################################################
+    [res, simSet] = improve(nbevals, adj_cmaes_sigma)
+    ##################################################
+    print res[0]
+    print "final score:", res[1]
+    return [res, simSet]
+
 
 ###########################################################################
 #                           Marquez procedures
 ###########################################################################
-
 def writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, nbruns,
                           chartColNames, mnCol, sensCol):
     filename = folders.animatlab_result_dir + "weightMarquez.txt"
@@ -2207,82 +2359,7 @@ def calcDeltaWeight(eta, mi, siprim, weighti):
     return dweight
 
 
-def copyFile(filename, src, dst):
-    sourcefile = src + filename
-    destfile = dst + filename
-    shutil.copy(sourcefile, destfile)
-
-
-def enableStims(ExternalStimuli, stims):
-    nbStims = len(ExternalStimuli)
-    for stim in range(nbStims):
-        ExternalStimuli[stim].find("Enabled").text = 'False'
-    for stim in range(len(stims)):
-        stimRank = stims[stim]
-        ExternalStimuli[stimRank].find("Enabled").text = 'True'
-
-
-def setMotorStimsOff(model, motorStimuli):
-    """
-    sets motors stimulis to "disabled"
-    """
-    for i in range(len(motorStimuli)):
-        motorEl = motorStimuli[i]
-        for idx, elem in enumerate(motorEl):
-            nomMoteur = elem.find("Name").text
-            print nomMoteur,
-            space = ""
-            for sp in range(3-len(nomMoteur)/8):
-                space += "\t"
-            print space + "set from  ",
-            print elem.find("Enabled").text,
-            elem.find("Enabled").text = "False"
-            print "   to   ", elem.find("Enabled").text
-    affichMotor(model, motorStimuli, 1)
-
-
-def setPlaybackControlMode(model, mode):
-    """
-    sets speed to 0 for Fastest and to 1 for matching Physics Steps
-    """
-    asimroot = model.tree.getroot()
-    oldmode = asimroot.find("PlaybackControlMode").text
-    if oldmode == '0':
-        oldmodestr = "fastest"
-    elif oldmode == '1':
-        oldmodestr = "match Physics"
-    else:
-        oldmodestr = "perso"
-    asimroot.find("PlaybackControlMode").text = str(mode)
-    # After changing a property, save the updated model
-    model.saveXML(overwrite=True)   # in the FinalModel dir
-    if mode == 0:
-        modestr = "fastest"
-    elif mode == 1:
-        modestr = "match Physics"
-    else:
-        modestr = "perso"
-    print "PlaybackControlMode has been changed from", oldmodestr,
-    print "to", modestr
-    print
-
-
-def setGravity(model, gravity):
-    asimroot = model.tree.getroot()
-    pathE = "Environment"
-    oldGravity = asimroot.find(pathE).find("Gravity").text
-    asimroot.find(pathE).find("Gravity").text = str(gravity)
-    # enableStims(ExternalStimuli, twitStMusclesSt)
-    # After changing a property, save the updated model
-    model.saveXML(overwrite=True)   # in the FinalModel dir
-    print "Gravity has been changed from", oldGravity, "to", gravity
-
-
-def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
-               nbruns, mnCol, sensCol, chart_col, chartColNames,
-               twitStMusclesSt, startTwitch, endTwitch, chartStart, rate,
-               eta, timeMes, delay):
-
+def runMarquez(folders, model, optSet, projMan):
     """
     This procedure is inspire from (Marquez et al, PLOS ComputBiol 2014)
     It controls ExternalStimulis to keep only stimuli on MNs
@@ -2308,10 +2385,12 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
 
     """
     global weightMarquez
-    lineStartTwitch = int((startTwitch-chartStart)*rate) + 1
-    lineEndTwitch = int((startTwitch + timeMes + delay - chartStart)*rate) + 2
+    lineStartTwitch = int((optSet.startTwitch - optSet.chartStart) *
+                          optSet.rate) + 1
+    lineEndTwitch = int((optSet.startTwitch + optSet.timeMes + optSet.delay -
+                         optSet.chartStart)*optSet.rate) + 2
 
-    corr_sensName = ['', '', '']  # starts with two empty columns
+    corr_sensName = ['', '']  # starts with two empty columns
     corr = []
     twitchAmpSet = [5.0000e-08, 2.0000e-08, 1.0000e-08, 5.0000e-09]
     # twitchAmpSet = [5.0000e-09]
@@ -2319,29 +2398,30 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
     for amp in range(len(twitchAmpSet)-1):
         weightMarquez.append([[[0]]])
     for amp in range(len(twitchAmpSet)):
-        for i in range(len(twitStMusclesSt)-1):
+        for i in range(len(optSet.twitStMusclesStNbs)-1):
             weightMarquez[amp].append([[0]])
     for amp in range(len(twitchAmpSet)):
-        for i in range(len(twitStMusclesSt)):
-            for j in range(len(sensCol)-1):
+        for i in range(len(optSet.twitStMusclesStNbs)):
+            for j in range(len(optSet.sensColChartNbs)-1):
                 weightMarquez[amp][i].append([0])
 
     mi = []
     tmp = []
     for amp in range(len(twitchAmpSet)):
-        for i in range(len(twitStMusclesSt)):
+        for i in range(len(optSet.twitStMusclesStNbs)):
             tmp.append(0)
         mi.append(tmp)
         tmp = []
     # Preparation of the first line of the corr table with sensory neuron names
-    for i in range(len(sensCol)):
-        corr_sensName.append(chartColNames[sensCol[i]])
+    for i in range(len(optSet.sensColChartNbs)):
+        corr_sensName.append(optSet.chartColNames[optSet.sensColChartNbs[i]])
     # print corr_sensName
     corr.append(corr_sensName)
 
     print "\n"
     print "copying asim File to Temp Directory"
-    simFileName = findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
+    # simFileName = findChartName(folders.animatlab_commonFiles_dir)[0]+'.asim'
+    simFileName = os.path.split(model.asimFile)[-1]
     sourceDir = folders.animatlab_commonFiles_dir
     destDir = folders.animatlab_rootFolder + "temp/"
     if not os.path.exists(destDir):
@@ -2358,34 +2438,37 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
     # initSimulation()
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet object
 
-    for i in range(len(tab_stims)):  # set all external stimuli to zero
-        ExternalStimuli[i].find("CurrentOn").text = '0'
-        ExternalStimuli[i].find("Enabled").text = 'False'
-    stimName = [tab_stims[twitStMusclesSt[0]][0],
-                tab_stims[twitStMusclesSt[1]][0]]
+    for i in range(len(optSet.tab_stims)):  # set all external stimuli to zero
+        # optSet.ExternalStimuli[i].find("CurrentOn").text = '0'
+        optSet.ExternalStimuli[i].find("Enabled").text = 'False'
+    stimName = [optSet.tab_stims[optSet.twitStMusclesStNbs[0]][0],
+                optSet.tab_stims[optSet.twitStMusclesStNbs[1]][0]]
 
     tableTmp = []
     k = 0
-    for ii in range(len(twitStMusclesSt)):
+    for ii in range(len(optSet.twitStMusclesStNbs)):
         print ""
         print 'twit=', ii
         corr_mn = []
-        stimRank = twitStMusclesSt[ii]
+        stimRank = optSet.twitStMusclesStNbs[ii]
         # print stimRank
-        ExternalStimuli[stimRank].find("Enabled").text = 'True'
-        ExternalStimuli[stimRank].find("StartTime").text = str(startTwitch)
-        ExternalStimuli[stimRank].find("EndTime").text = str(endTwitch)
-        tab_stims = affichExtStim(ExternalStimuli, 1)  # 0 -> no print
+        optSet.ExternalStimuli[stimRank].find("Enabled").text = 'True'
+        optSet.ExternalStimuli[stimRank].\
+            find("StartTime").text = str(optSet.startTwitch)
+        optSet.ExternalStimuli[stimRank].\
+            find("EndTime").text = str(optSet.endTwitch)
+        optSet.tab_stims = affichExtStim(optSet.ExternalStimuli, 1)
         model.saveXML(overwrite=True)
         simSet.samplePts = []
         simSet.set_by_range({stimName[ii] + ".CurrentOn": twitchAmpSet})
         print simSet.samplePts
         projMan.make_asims(simSet)
         projMan.run(cores=-1)
-        ExternalStimuli[stimRank].find("Enabled").text = 'False'
+        optSet.ExternalStimuli[stimRank].find("Enabled").text = 'False'
         for amp in range(len(twitchAmpSet)):
             twitchdir = folders.animatlab_rootFolder + "ChartTwitchFiles/"
-            tableTmp.append(tablo(folders, findTxtFileName(folders, amp+1)))
+            tableTmp.append(tablo(folders,
+                                  findTxtFileName(model, optSet, amp+1)))
             stimtxt = '%2.2f' % (twitchAmpSet[amp] * 1e09)
             comment = '\t' + stimName[ii] + ' ' + stimtxt + 'nA' + ' ' + str(k)
             savechartfile("twitchchart", twitchdir, tableTmp[k], comment)
@@ -2400,45 +2483,50 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
         for asimFileName in simTwitchFileNames:
             copyFile(asimFileName, sourceDir, destDir+stimName[ii])
 
+# TODO:
     for amp in range(len(twitchAmpSet)):
-        print
-        print 'twitchAmp: ', twitchAmpSet[amp]
-        for t in range(nbruns):
-            for ii in range(len(twitStMusclesSt)):
+        # print
+        # print 'twitchAmp: ', twitchAmpSet[amp]
+        for t in range(optSet.nbruns):
+            for ii in range(len(optSet.twitStMusclesStNbs)):
                 if t == 0:
                     corr_mn.append([twitchAmpSet[amp]])
-                    corr_mn.append(chartColNames[mnCol[ii]])
-                for j in range(len(sensCol)):
+                    corr_mn.append(optSet.
+                                   chartColNames[optSet.mnColChartNbs[ii]])
+                for j in range(len(optSet.sensColChartNbs)):
                     # miprec = mi[ii]
                     mitempTab = extract(tableTmp[amp + ii*len(twitchAmpSet)],
-                                        mnCol[ii],
+                                        optSet.mnColChartNbs[ii],
                                         lineStartTwitch,
                                         lineEndTwitch)
-                    mi[amp][ii] = mitempTab[int(timeMes * rate)] - mitempTab[0]
+                    mi[amp][ii] = mitempTab[int(optSet.timeMes *
+                                                optSet.rate)] - mitempTab[0]
                     sitempTab = extract(tableTmp[amp + ii*len(twitchAmpSet)],
-                                        sensCol[j],
+                                        optSet.sensColChartNbs[j],
                                         lineStartTwitch,
                                         lineEndTwitch)
                     sitempPrimTab = derive(sitempTab)
-                    siprim = sitempPrimTab[int((timeMes + delay)*rate)-2] \
+                    siprim = sitempPrimTab[int((optSet.timeMes +
+                                                optSet.delay)*optSet.rate)-2] \
                         - sitempPrimTab[0]
-                    deltaweight = calcDeltaWeight(eta, mi[amp][ii],
+                    deltaweight = calcDeltaWeight(optSet.eta, mi[amp][ii],
                                                   siprim,
                                                   weightMarquez[amp][ii][j][t])
-                    if deltaweight == 0:
-                        print "ii= {}; j= {}; siprim ={}".format(ii, j, siprim)
+                    # if deltaweight == 0:
+                    #   print "ii= {}; j= {}; siprim ={}".format(ii, j, siprim)
                     nextweight = weightMarquez[amp][ii][j][t] + deltaweight
                     weightMarquez[amp][ii][j].append(nextweight)
                     txt = "t: %2d; mi[%2d] = %.4e; \tdeltaweight = %.4e"
                     txt = txt + "\tweightMarquez[%2d]=%.5e;"
                     txt = txt + "\t   weightMarquez[%2d]=%2.4e"
-                    if j == 0:
-                        print txt % (t, ii, mi[amp][ii], deltaweight,
-                                     t, weightMarquez[amp][ii][j][t],
-                                     t+1, weightMarquez[amp][ii][j][t+1])
+                    # if j == 0:
+                    #   print txt % (t, ii, mi[amp][ii], deltaweight,
+                    #                t, weightMarquez[amp][ii][j][t],
+                    #                t+1, weightMarquez[amp][ii][j][t+1])
                     # print weightMarquez
                     corrcoeff = correl(tableTmp[amp + ii*len(twitchAmpSet)],
-                                       mnCol[ii], sensCol[j],
+                                       optSet.mnColChartNbs[ii],
+                                       optSet.sensColChartNbs[j],
                                        lineStartTwitch, lineEndTwitch)
                     if t == 0:
                         corr_mn.append('{:02.6f}'.format(corrcoeff))
@@ -2447,10 +2535,11 @@ def runMarquez(folders, model, projMan, ExternalStimuli, tab_stims,
                     corr.append(corr_mn)
                     corr_mn = []
 
-    print ''
+    # print ''
     affich_table(corr)
-    writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, nbruns,
-                          chartColNames, mnCol, sensCol)
+    writeWeightMarquezTab(folders, weightMarquez, twitchAmpSet, optSet.nbruns,
+                          optSet.chartColNames, optSet.mnColChartNbs,
+                          optSet.sensColChartNbs)
 
     print "\ncopying original asim File back to FinalModel Directory"
     sourceDir = folders.animatlab_rootFolder + "temp/"
