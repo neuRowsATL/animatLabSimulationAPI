@@ -49,6 +49,37 @@ Modified September 1, 2017:
         # else:
         #     chartN = ""
 
+Modified September 14 (D. Cattaert):
+    all functions used in optimization processes directly read parameter
+    values in the optSet object (from class AnimatlabOptimSetting)
+    This major change allows to reduce drastically the number of
+    parameters sent in function calls
+
+    procedure to get chartFileName is simplified. It reads directly the name
+    of the chart file being used in the .asim file
+    def findChartName(model, optSet):
+        simN = (os.path.split(model.asimFile)[-1]).split(".")[-2]
+        chartN = optSet.chartName[optSet.selectedChart]
+        chartName = simN + "-1_" + chartN + ".txt"
+        return [simN, chartN, chartName]
+
+    def findTxtFileName(model, optSet, x):
+        simFileName = findChartName(model, optSet)[0]
+        chartFileName = findChartName(model, optSet)[1]
+        txtFileName = simFileName + "-" + str(x) + "_" + chartFileName + '.txt'
+        # print "reading {}".format(txtFileName)
+        return txtFileName
+
+    other funcitons addded :
+        copyFile
+        copyFileDir
+
+Modified September 15, 2017 (D. Cattaert):
+    correction in "comparetests" line 1438 to avoid crash due to  bestvalue
+    not being assigned
+    line 1438 elif replaced by else
+            else:  # sortQuality[0][0] = 'quality_minus'
+
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -1287,14 +1318,16 @@ def testquality(folders, optSet, table, template, comment):
         mse = MeanSquarreErrorTemplate(tab, template,
                                        optSet.lineStart+30,
                                        optSet.lineEnd-30, lag)
-        if lag == -30:
-            print comment, mse,
+        # if lag == -30:
+        #     print comment, mse,
         msetab.append(mse)
         dmse = mse - prevmse
         prevmse = mse
         lag += 1
+        print "/",
     mse = min(msetab)
-    print "\t -->   min mse = ", mse, coactpenality, coact,
+    # print " --> min mse = ", mse, coactpenality, coact,
+    # print " --> min mse = ", mse,
     # cost function: coactivation of MN
     if min(tabMN0[0]) < 0:
         res = coactivityVN(tabMN0, tabMN1, optSet.lineStart, optSet.lineEnd,
@@ -1315,14 +1348,6 @@ def comparetests(folders, model, optSet, step,
                  value_base, value_minus, value_plus,
                  template,
                  bestfit, bestfitCoact, rang):
-    """
-        folders, model, optSet, step,
-                 value_base, value_minus, value_plus,
-                 mvtcolumn, mnCol, listeNeurons, listeNeuronsFR,
-                 lineStart, lineEnd, template,
-                 activThr, coactivityFactor,
-                 bestfit, bestfitCoact, limQuality, rang):
-    """
 
     global initialvalue
     txtchart = []
@@ -1332,31 +1357,35 @@ def comparetests(folders, model, optSet, step,
     # Analyzes the quality of the results (here we just look at stability
     #                               after movement was supposed to stop)
     rep = testquality(folders, optSet, minus, template, "minus")
-    [mseminus, coact_minus, comin] = rep
+    [mse_minus, coact_minus, comin] = rep
     # print "quality_minus = {}".format(quality_minus)
-    quality_minus = mseminus + coact_minus
+    quality_minus = mse_minus + coact_minus
     plus = tablo(folders, findTxtFileName(model, optSet, 2))
     rep = testquality(folders, optSet, plus, template, "plus")
-    [mseplus, coact_plus, coplus] = rep
-    quality_plus = mseplus + coact_plus
+    [mse_plus, coact_plus, coplus] = rep
+    quality_plus = mse_plus + coact_plus
     # print "quality_plus = {}".format(quality_plus)
 
     if step == 0:
         base = tablo(folders, findTxtFileName(model, optSet, 3))
         rep = testquality(folders, optSet, base, template, "base")
-        [msebase, coact_base, coba] = rep
-        quality_base = msebase + coact_base
-        txt1 = "quality_minus = {}\tquality_plus = {}\tquality_base = {}"
+        [mse_base, coact_base, coba] = rep
+        quality_base = mse_base + coact_base
+        txt1 = "mse_minus = {}\tmse_plus = {}\tmse_base = {}"
         txt2 = "coact_minus = {}\tcoact_plus = {}\tcoact_base = {}"
-        print txt1.format(quality_minus, quality_plus, quality_base)
+        txt3 = "quality_minus = {}\tquality_plus = {}\tquality_base = {}"
+        print txt1.format(mse_minus, mse_plus, mse_base)
         print txt2.format(coact_minus, coact_plus, coact_base)
+        print txt3.format(quality_minus, quality_plus, quality_base)
     else:
         quality_base = bestfit  # this was the previous bestfit
         coact_base = bestfitCoact
-        txt1 = "quality_minus = {}\tquality_plus = {}"
+        txt1 = "mse_minus = {}\tmse_plus = {}"
         txt2 = "coact_minus = {}\tcoact_plus = {}"
-        print txt1.format(quality_minus, quality_plus)
+        txt3 = "quality_minus = {}\tquality_plus = {}"
+        print txt1.format(mse_minus, mse_plus)
         print txt2.format(coact_minus, coact_plus)
+        print txt3.format(quality_minus, quality_plus)
 
     stop = 0
     qualityTest = {}
@@ -1400,9 +1429,6 @@ def comparetests(folders, model, optSet, step,
                 bestvalue = value_base
                 if step == 0:
                     txtchart = base
-            # else:
-            #    bestvalue = value_base
-            #    bestfit = quality_base
         elif sortQuality[0][0] == 'quality_plus':
             initialvalue = value_plus
             finalAngle = plus[optSet.lineEnd][optSet.mvtcolumn]
@@ -1413,10 +1439,7 @@ def comparetests(folders, model, optSet, step,
                 bestfitCoact = coact_plus
                 bestvalue = value_plus
                 txtchart = plus
-                # improved = 1
-            # else:
-            #   bestvalue = value_plus
-        elif sortQuality[0][0] == 'quality_minus':
+        else:  # sortQuality[0][0] = 'quality_minus'
             initialvalue = value_minus
             finalAngle = minus[optSet.lineEnd][optSet.mvtcolumn]
             print "previous bestfit = {}".format(bestfit)
@@ -1426,13 +1449,9 @@ def comparetests(folders, model, optSet, step,
                 bestfitCoact = coact_minus
                 bestvalue = value_minus
                 txtchart = minus
-                # improved = 1
-            # else:
-            #    bestvalue = value_minus
 
     if bestfit < optSet.limQuality:
         print "bestfit < lim => stop steps of rang : {}".format(rang)
-        # bestvalue = tab_stims[stimRank][param]
         stop = 1
     # if improved == 0:
     #    print "final angle unchanged"
@@ -1505,18 +1524,6 @@ def runThreeStimTests(folders, model, optSet, projMan, simSet,
 def improveStimparam(folders, model, optSet, projMan, simSet,
                      paramName, stimRank, rang, trial, epoch,
                      deltaStim, initialvalue, template, bestfit, bestfitCoact):
-    """
-        folders, model, optSet, projMan, simSet,
-                     stimRank, paramName,
-                     readAnimatLabSimDir, tab_stims, listeNeurons,
-                     listeNeuronsFR,
-                     mvtcolumn, mnCol, rate, lineStart, lineEnd,
-                     rang, trial, epoch,
-                     deltaStim, maxDeltaStim, limits, limQuality,
-                     activThr, coactivityFactor,
-                     initialvalue, template, nbsteps,
-                     bestfit, bestfitCoact):
-    """
     # global deltaStim, number, bestfit
     previous_bestfit = bestfit
     # previous_bestfitcoact = bestfitCoact
@@ -1563,18 +1570,6 @@ def runThreeSynTests(folders, model, optSet, projMan, simSet,
                      multSyn, initialSynvalue, template,
                      bestsynfit, bestsynfitCoact):
 
-    """
-         folders, model, optSet, projMan, simSet,
-         synRank,
-         Connexions, tab_connexions,
-         listeNeurons, listeNeuronsFR,
-         mvtcolumn, mnCol, rate, lineStart, lineEnd,
-         rang, step, trial, epoch,
-         multSyn, maxMultSyn, limits, limQuality,
-         activThr, coactivityFactor,
-         initialSynvalue, bestsynfit, bestsynfitCoact,
-         template):
-    """
     maxSynAmp = optSet.limits[1]
     maxG, maxWeight = optSet.limits[2], optSet.limits[3]
     if paramSynName == "Weight":
@@ -1670,18 +1665,6 @@ def improveSynparam(folders, model, optSet, projMan, simSet,
                     paramSynName, synRank, rang, trial, epoch,
                     multSyn, initialSynvalue, template,
                     bestsynfit, bestsynfitCoact):
-    """
-        folders, model, optSet,  projMan, simSet,
-                    synRank, paramSynName,
-                    Connexions, tab_connexions,
-                    listeNeurons, listeNeuronsFR,
-                    mvtcolumn, mnCol, rate,
-                    lineStart, lineEnd, rang, trial, epoch,
-                    multSyn, maxMultSyn, limits, limQuality,
-                    activThr, coactivityFactor,
-                    initialSynvalue, template, nbsteps,
-                    bestsynfit, bestsynfitCoact):
-    """
 
     previous_bestsynfit = bestsynfit
     bestsynvalue = 0
