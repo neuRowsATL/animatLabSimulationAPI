@@ -10,6 +10,9 @@ Modified by cattaert June 08 2017
 Modified by cattaert September 1, 2017:
     added handling of motorStims (self.motorStimuli, self.nbmotors,
     self.tab_motors)(in progress)
+Modified September 21, 2017 (D; Cattaert)
+    self.folders created to allow its use in "actualizeparamLoeb" procedure
+    now the template is saved in the "finalModel" folder
 """
 
 import random
@@ -44,6 +47,7 @@ class OptimizeSimSettings():
                  paramMarquezValue=[1, 2], paramMarquezType=[int, int],
                  paramMarquezCoul=['white', 'white']):
 
+        self.folders = folders
         self.model = model
         self.projMan = projMan
         self.sims = sims
@@ -279,6 +283,7 @@ class OptimizeSimSettings():
         self.allPhasesSynFR = [self.totalsynFR]
 
         # CMAe parameters
+        self.seuilMSEsave = 35
         self.x0, self.realx0 = [], []
         self.lower, self.upper = [], []
         self.reallower, self.realupper = [], []
@@ -317,82 +322,6 @@ class OptimizeSimSettings():
              self.template] = self.allPhasesStim[phase]
         # here we use only onse phase => phase = 0
         # ################################################################
-        """
-        for param in range(len(self.seriesStimParam)):
-            paramName = self.seriesStimParam[param]
-            if paramName == "StartTime":
-                for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][1]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.stimMax.append(self.endPos2)
-            elif paramName == "EndTime":
-                for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][2]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.stimMax.append(self.endPos2)
-            elif paramName == "CurrentOn":
-                for stim in range(len(listSt)):
-                    x0stimtmp = self.tab_stims[listSt[stim]][3]
-                    if x0stimtmp == 0:
-                        x0stimtmp = 1e-10
-                    x0stimNorm = x0stimtmp/self.maxStim
-                    self.x0.append(x0stimNorm)
-                    self.lower.append(x0stimNorm -
-                                      abs(x0stimNorm)*self.fourchetteStim)
-                    self.upper.append(x0stimNorm +
-                                      abs(x0stimNorm)*self.fourchetteStim)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.stimMax.append(self.maxStim)
-        for synparam in range(len(self.seriesSynParam)):
-            synparamName = self.seriesSynParam[synparam]
-            if synparamName == 'G':
-                firstConnexion = findFirstType(self.model, "Connexions")
-                for syn in range(len(self.synList)):
-                    rg = self.synList[syn] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synParName.append(temp)
-                    x0syntmp = self.tab_connexions[self.synList[syn]][3]
-                    if x0syntmp == 0:
-                        x0syntmp = 0.1
-                    self.x0.append(x0syntmp/self.maxG)  # 0<G<maxG
-                    self.lower.append((x0syntmp/self.fourchetteSyn)/self.maxG)
-                    self.upper.append((x0syntmp*self.fourchetteSyn)/self.maxG)
-                    self.synMax.append(self.maxG)
-        for synparam in range(len(self.seriesSynFRParam)):
-            synparamName = self.seriesSynFRParam[synparam]
-            if synparamName == "Weight":
-                firstConnexion = findFirstType(self.model, "SynapsesFR")
-                for synFR in range(len(self.synListFR)):
-                    rg = self.synListFR[synFR] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synFRParName.append(temp)
-                    x0syntmp = self.tab_connexionsFR[self.synListFR[synFR]][1]
-                    if x0syntmp == 0:
-                        x0syntmp = 5e-010
-                    self.x0.append(x0syntmp/self.maxWeight)
-                    # 0 < Weight < maxWeight
-                    if self.tab_connexionsFR[self.synListFR[synFR]][3] < 0:
-                        self.lower.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                        self.upper.append(0.)
-                    else:
-                        self.lower.append(0.)
-                        self.upper.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                    self.synMax.append(self.maxWeight)
-        """
 
     def actualizeparamMarquez(self):
         print "optSet: actualizing Marquez params"
@@ -497,7 +426,9 @@ class OptimizeSimSettings():
                                               self.startMvt2, self.endMvt2,
                                               self.angle2, self.endPos2)
         savecurve(self.mvtTemplate,
-                  folders.animatlab_result_dir, "template.txt")
+                  self.folders.animatlab_result_dir, "template.txt")
+        print "mvtTemplate.txt saved in",
+        print self.folders.animatlab_result_dir
         # ##############################################################
         #   Selection of "dontChange" & "disabled" for Optimization    #
         # ##############################################################

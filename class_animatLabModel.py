@@ -5,6 +5,23 @@ Last Modified:  May 20, 2016 (version 3)
 Description: This class opens and saves AnimatLab models from .aproj files.
 Modified August 23 2017 Daniel Cattaert
     ActualizeAproj now include StartTime and EndTime of externalStimuli
+
+modified September 19, 2017 (D. Cattaert, C. Halgand):
+    procedure saveXML modified to avoid problems whith "." in path
+        if overwrite:
+            if fileName == '':
+                fileName = self.asimFile
+            else:
+                fileName = os.path.join(os.path.dirname(self.asimFile),
+                                        os.path.splitext(fileName)[0]+'.asim')
+        else:
+            saveDir = os.path.dirname(self.asimFile)
+            rootName = os.path.basename(os.path.splitext(self.asimFile)[0])
+            oldname = rootName + '*.asim'
+            ix = len(glob.glob(os.path.join(saveDir, oldname)))
+            newname = rootName + '-%i.asim' % ix
+            fileName = os.path.join(saveDir, newname)
+    procedure saveXMLaproj changed in the same way
 """
 
 # Import dependencies
@@ -99,18 +116,18 @@ class AnimatLabModel(object):
             aprojFile = glob.glob(os.path.join(self.projectFolder, '*.aproj'))
             if len(aprojFile) == 0:
                 error = "No AnimatLab project file exists with extension " \
-                        "*.aproj in folder:\n%s" +\
-                        "\n\nCheck AnimatLab project folder for consistency."
+                        "*.aproj in folder:  %s" +\
+                        "  Check AnimatLab project folder for consistency."
                 raise AnimatLabModelError(error % self.projectFolder)
             elif len(aprojFile) > 1:
                 error = "Multiple AnimatLab aproj files exist with extension" \
-                        " *.aproj in folder:\n%s" +\
-                        "\n\nCheck AnimatLab project folder for consistency."
+                        " *.aproj in folder: %s" +\
+                        "  Check AnimatLab project folder for consistency."
                 raise AnimatLabModelError(error % self.projectFolder)
 
             self.aprojFile = aprojFile[0]
             aprojFile = os.path.split(self.aprojFile)[-1]
-            projectFileName = aprojFile.split('.')[0]
+            projectFileName = os.path.splitext(aprojFile)[0]
             self.aprojFile = os.path.join(self.projectFolder, aprojFile)
 
             if asimFile != '':
@@ -135,15 +152,15 @@ class AnimatLabModel(object):
                 elif len(glob.glob(os.path.join(
                                     self.projectFolder, '*.asim'))) == 0:
                     error = "No standalone simulation file exists with " \
-                            "extension *.asim in folder:\n%s" \
-                            "\n\nGenerate a standalone simulation file from " \
+                            "extension *.asim in folder: %s" \
+                            "  Generate a standalone simulation file from " \
                             "the AnimatLab GUI"
                     txt = error % self.projectFolder
                     raise AnimatLabModelError(txt)
                 else:
                     error = "Multiple simulation files exist with extension "\
-                            "*.asim in folder\n%s" +\
-                            "\n\nDelete duplicates and leave one file or "\
+                            "*.asim in folder %s" +\
+                            "  Delete duplicates and leave one file or "\
                             "initiate AnimatLabModel object with ASIM file "\
                             "specified"
                     raise AnimatLabModelError(error)
@@ -730,9 +747,28 @@ class AnimatLabModel(object):
         Last updated:   December 28, 2015
         Modified by:    Bryce Chung
         """
+        if overwrite:
+            if fileName == '':
+                fileName = self.asimFile
+            else:
+                fileName = os.path.join(os.path.dirname(self.asimFile),
+                                        os.path.splitext(fileName)[0]+'.asim')
+        else:
+            saveDir = os.path.dirname(self.asimFile)
+            rootName = os.path.basename(os.path.splitext(self.asimFile)[0])
+            oldname = rootName + '*.asim'
+            ix = len(glob.glob(os.path.join(saveDir, oldname)))
+            newname = rootName + '-%i.asim' % ix
+            fileName = os.path.join(saveDir, newname)
+        """
+        print "----------------------------------"
+        print 'asimFile', self.asimFile
+        print 'fileName', fileName
+        print 'overwrite', overwrite
         if fileName == '':
             if overwrite:
                 fileName = self.asimFile
+                print '--fileName', fileName
             else:
                 saveDir = os.path.split(self.asimFile)[0]
                 rootName = os.path.split(self.asimFile)[-1].split('.')[0]
@@ -740,7 +776,11 @@ class AnimatLabModel(object):
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
                 newname = rootName + '-%i.asim' % ix
                 fileName = os.path.join(saveDir, newname)
-
+                print 'saveDir', saveDir
+                print 'rootName', rootName
+                print 'oldName', oldname
+                print 'newName', newname
+                print 'fileName', fileName
         else:
             if overwrite:
                 fileName = os.path.join(os.path.split(self.asimFile)[0],
@@ -752,13 +792,13 @@ class AnimatLabModel(object):
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
                 newname = rootName + '-%i.asim' % ix
                 fileName = os.path.join(saveDir, newname)
-                """
+
                 ix = len(glob.glob(
                     os.path.join(os.path.split(self.asimFile)[0],
                                  fileName.split('.')[0]+'*.asim')))
                 fileName = os.path.join(os.path.split(self.asimFile)[0],
                                         fileName.split('.')[0]+'-%i.asim' % ix)
-                """
+        """
         print 'Saving file: %s' % fileName
         self.tree.write(fileName)
 
@@ -823,7 +863,7 @@ class AnimatLabModel(object):
         # self.tree = elementTree.parse(self.asimFile)    # return to asimfile
         # root = self.tree.getroot()
 
-    def asimtoaproj(self, el, ptVar, pts, simpar):
+    def asimtoaproj(self, el, ptVar, pts, simpar, affiche=0):
         # reads Animatlab Aproj file param value and scale
         va = el.get("Value")
         sc = el.get("Scale")
@@ -835,7 +875,8 @@ class AnimatLabModel(object):
             txt2 = "= " + str(va)
             for k in range(2-(len(txt2)/8)):
                 txt2 += "\t"
-            print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            if affiche:
+                print txt1 + txt2 + ">>\t" + str(pts[ptVar])
             # Update the AnimatLab element value
             newValue = pts[ptVar]
             if sc == 'nano':
@@ -853,7 +894,8 @@ class AnimatLabModel(object):
             txt2 = "= " + str(ac)
             for k in range(2-(len(txt2)/8)):
                 txt2 += "\t"
-            print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            if affiche:
+                print txt1 + txt2 + ">>\t" + str(pts[ptVar])
             # Update the AnimatLab element value
             newActual = pts[ptVar]
             if sc == 'nano':
@@ -872,9 +914,9 @@ class AnimatLabModel(object):
         el.set("Scale", sc)
         el.set("Actual", str(newActual))
 
-    def actualizeAproj(self, obj_simSet):
+    def actualizeAproj(self, obj_simSet, affiche=0):
         for ix, pts in enumerate(obj_simSet.samplePts):
-            print ix, pts
+            # print ix, pts
             for ptVar in pts:
                 # Find the AnimatLab element by name
                 name, param = ptVar.split('.')
@@ -883,21 +925,21 @@ class AnimatLabModel(object):
                 if param == 'G':
                     # ATTENTION!!! Animatlab simfile indique G = Value
                     el = node.find('SynapticConductance')
-                    self.asimtoaproj(el, ptVar, pts, "Value")
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
                 elif param == "Weight":
                     # ATTENTION!!! Animatlab simfile indique Weight = Actual
                     el = node.find('Weight')
-                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
                 elif param == 'CurrentOn':
                     # ATTENTION!!! Animatlab simfile indique CurrentOn = Actual
                     el = node.find('CurrentOn')
-                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
                 elif param == 'StartTime':
                     el = node.find('StartTime')
-                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
                 elif param == 'EndTime':
                     el = node.find('EndTime')
-                    self.asimtoaproj(el, ptVar, pts, "Actual")
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
 
     def actualizeAprojStimState(self, asimtab_stims):
             for extStim in range(len(asimtab_stims)):
@@ -930,33 +972,35 @@ class AnimatLabModel(object):
         The default file path is the project folder of the AnimatLabAProj
         instantiation.
 
-        Last updated:   February 14, 2017
+        Last updated:   September 19, 2017
         Modified by:    Daniel Cattaert
         """
         if fileName == '':
             if overwrite:
-                fileName = self.aprojFile
+                fileNameOK = self.aprojFile
             else:
                 saveDir = os.path.split(self.aprojFile)[0]
-                rootName = os.path.split(self.aprojFile)[-1].split('.')[0]
+                saveName = os.path.split(self.aprojFile)[-1]
+                rootName = os.path.splitext(saveName)[0]
                 oldname = rootName + '*.aproj'
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
-                newname = rootName + '-%i.aproj' % ix
-                fileName = os.path.join(saveDir, newname)
+                newname = rootName + '-{0:d}.aproj'.format(ix)
+                fileNameOK = os.path.join(saveDir, newname)
         else:
             if overwrite:
                 saveDir = os.path.split(fileName)[0]
-                ficName = fileName.split('.')[0]+'.aproj'
-                fileName = os.path.join(saveDir, ficName)
+                ficName = os.path.splitext(fileName)[0] + '.aproj'
+                fileNameOK = os.path.join(saveDir, ficName)
             else:
                 saveDir = os.path.split(fileName)[0]
-                ficName = fileName.split('.')[0]+'*.aproj'
+                ficName = os.path.splitext(fileName)[0] + '*.aproj'
                 ix = len(glob.glob(os.path.join(saveDir, ficName)))
-                newname = fileName.split('.')[0]+'-%i.aproj' % ix
-                fileName = os.path.join(saveDir, newname)
+                newname = os.path.splitext(fileName)[0] +\
+                    '-{0:d}.aproj'.format(ix)
+                fileNameOK = os.path.join(saveDir, newname)
 
-        print 'Saving file: %s' % fileName
-        self.aprojtree.write(fileName)
+        print 'Saving file: {}'.format(fileNameOK)
+        self.aprojtree.write(fileNameOK)
 
 
 class AnimatLabSimFile(object):
@@ -1220,7 +1264,7 @@ class AnimatLabSimFile(object):
             print "WARNING: No matches found for elements with ID:\n%s" % elID
             return None
 
-
+"""
 if __name__ == '__main__':
     folders = FolderOrg(subdir="ArmSPike13e2")
     folders.affectDirectories()
@@ -1233,3 +1277,4 @@ if __name__ == '__main__':
     if not os.path.exists(aprojSaveDir):
         os.makedirs(aprojSaveDir)
     # model.saveXMLaproj(aprojSaveDir + "ArmSpike13.aproj")
+"""

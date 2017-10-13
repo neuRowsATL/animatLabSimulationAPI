@@ -12,6 +12,7 @@ import tkFileDialog
 from Tkinter import Tk
 from Tkinter import Button
 import class_animatLabModel as AnimatLabModel
+from optimization import copyFileDir
 from FoldersArm import FolderOrg
 folders = FolderOrg()
 
@@ -62,6 +63,8 @@ def readAproj():
     aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
     if not os.path.exists(aprojSaveDir):
         os.makedirs(aprojSaveDir)
+        copyFileDir(animatsimdir, aprojSaveDir, copy_dir=0)
+    print "... FINISHED"
 
 
 def changeMeshPath():
@@ -81,10 +84,24 @@ def saveAnimatLabDir(directory):
     f.close()
 
 
+def readAnimatLabSimDir():
+    filename = "animatlabSimDir.txt"
+    try:
+        fic = open(filename, 'r')
+        directory = fic.readline()
+        fic.close()
+    except:
+        directory = ""
+    # print "First instance: Root directory will be created from GUI"
+    return directory
+
+
 # #######################################################################
 #               Creation Tkinter window & dialog file box               #
 # #######################################################################
-mysimdir = "//Mac/Home/Documents/Labo/Scripts/AnimatLabV2/Human/test/"
+animatsimdir = readAnimatLabSimDir()
+mysimdir = os.path.split(animatsimdir)[0]
+# mysimdir = "//Mac/Home/Documents/Labo/Scripts/AnimatLabV2/Human/test/"
 panneau = Tk()
 
 panneau.title("Change Mesh Path in .aproj File")

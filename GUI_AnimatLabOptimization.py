@@ -1252,7 +1252,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         for idx, elem in enumerate(self.optSet.stimParam):
             itm1 = QtWidgets.QTableWidgetItem(str(elem))
             itm1.setFlags(itm1.flags() | QtCore.Qt.ItemIsUserCheckable)
-            if self.optSet.stimParam[idx] in self.optSet.paramOpt['seriesStimParam']:
+            txt = self.optSet.stimParam[idx]
+            if txt in self.optSet.paramOpt['seriesStimParam']:
                 itm1.setCheckState(QtCore.Qt.Checked)
                 itm1.setForeground(QtGui.QColor('red'))
             else:
