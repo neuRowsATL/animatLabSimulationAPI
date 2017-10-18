@@ -68,6 +68,13 @@ modified October 12, 2017 (D.Cataert):
     coactpenality and coact values plus the names of the .asim and chart files
 modified October 13, 2017 (D.Cataert):
     added a distance calculation on parameter space
+modified October 16, 2017 (D.Cataert):
+    modified distance calculus (gives the exact distance instead of sqarre)
+modified October 17, 2017 (D.Cataert):
+    two new procedures created:
+        initializeExecLoeb(): now initialize Loeb procedure before running it
+        continueLoeb(nbepoch = 1) : allows to go on previous Loebrun for a
+        given number of nbepoch
 """
 import class_animatLabModel as AnimatLabModel
 import class_animatLabSimulationRunner as AnimatLabSimRunner
@@ -95,14 +102,17 @@ from optimization import affichConnexions, affichConnexionsFR
 from optimization import writeTitres, tablo, findTxtFileName
 from optimization import readTabloTxt
 from optimization import savechartfile
-# from optimization import writeBestResSuite
+
+from optimization import writeBestResSuite
 from optimization import writeaddTab
 # from optimization import testquality
 from optimization import findList_asimFiles
 from optimization import getSimSetFromAsim
 from optimization import setMotorStimsOff
 from optimization import copyFile, copyFileDir, copyRenameFile
+from optimization import copyFileWithExt, createSubDirIncrem
 from optimization import findFirstType
+
 # from optimization import enableStims
 # from optimization import getlistparam
 from optimization import savefileincrem, affich_table
@@ -276,8 +286,10 @@ def saveparams(filename):
                   optSet.fourchetteSyn
                   ]
     comment = ""
-    writeaddTab(folders, listparnam, filename, 'w', comment, 0)
-    writeaddTab(folders, listparval, filename, 'a', comment, 0)
+    if existe(folders.animatlab_result_dir + filename):
+        writeaddTab(folders, listparval, filename, 'a', comment, 0)
+    else:
+        writeaddTab(folders, listparnam, filename, 'w', comment, 0)
 
 
 def checknonzeroSynFR(optSet):
@@ -551,8 +563,9 @@ def calculatedist(normVal, simFileName):
             dist = 0
             for par in range(len(normVal[fic2])):
                 dist += (normVal[fic1][par] - normVal[fic2][par])**2
-            print nb1, "\t", nb2, "\t", dist
-            tabdistances[fic1].append(dist)
+            distance = dist**0.5
+            print nb1, "\t", nb2, "\t", distance
+            tabdistances[fic1].append(distance)
             tabnames[fic1].append(nb1 + "-" + nb2)
             dist = 0
         print
@@ -643,7 +656,11 @@ def initializeLoeb():
 def execLoeb():
     global essai
     saveparams(folders.subdir + "Loeb.par")
-    essaiNb = runLoeb(folders, model, optSet, projMan, essai)
+    try:
+        essaiNb = runLoeb(folders, model, optSet, projMan, essai)
+    except:
+        initializeLoeb()
+        essaiNb = runLoeb(folders, model, optSet, projMan, essai)
     essai = essaiNb
     # ---------------------------------------------------------
     # Copies the bestfit .asim file in LoebBestSimFiles folder
@@ -653,14 +670,41 @@ def execLoeb():
     filesource = simFileName + ".asim"
     filedest = simFileName + ".asim"
     comment = ""
-    copyRenameFile(sourcedir, filesource, destdir, filedest, comment,
-                   replace=0)
+    numero = copyRenameFile(sourcedir, filesource,
+                            destdir, filedest, comment,
+                            replace=0)
+    comment = simFileName + '-{0:d}.asim'.format(numero)
+    titles = ["trial", "eval", "mse", "coactpenality", "coact", comment]
+    writeBestResSuite(folders, "LoebFitCourse.txt", titles, 0)
+
     # ---------------------------------------------------------
     # saves the bestfit .aproj file in AprojFiles folder
     name = os.path.splitext(aprojFileName)[0]
     ext = os.path.splitext(aprojFileName)[1]
     ficname = name + "Loeb" + ext
     actualiseSaveAprojFromAsimFile(model.asimFile, ficname)
+    """
+    # Saves the corresponding .aproj file in CMAeMinAprojFiles folder
+    aprojFileName = os.path.split(model.aprojFile)[-1]
+    model.actualizeAproj(simSet)
+    name = os.path.splitext(aprojFileName)[0]
+    ext = os.path.splitext(aprojFileName)[1]
+    ficname = name + "CMAeMin" + ext
+    aprojCMAeDir = folders.animatlab_rootFolder + "CMAeMinAprojFiles/"
+    model.saveXMLaproj(aprojCMAeDir + ficname)
+    print "-----------------------------------"
+    comment = simFileName + '-{0:d}.asim'.format(numero)
+    """
+
+
+def initializeExecLoeb():
+    initializeLoeb()
+    execLoeb()
+
+
+def continueLoeb(nbepoch=1):
+    optSet.nbepoch = nbepoch
+    execLoeb()
 # =============================================================================
 
 
@@ -708,6 +752,12 @@ def execCMAe(nbevals):
     model.saveXMLaproj(aprojSaveDir + ficname)
     """
     actualiseSaveAprojFromAsimFile(asimFileName, ficname)
+    cwd = os.getcwd()
+    CMAeDataSourceDir = cwd
+    CMAeDataDestDir = folders.animatlab_rootFolder + "CMAeData/"
+    CMAeDataSubDir = "CMAeData"
+    destDir = createSubDirIncrem(CMAeDataDestDir, CMAeDataSubDir)
+    copyFileWithExt(CMAeDataSourceDir, destDir, ".dat")
 
 # =============================================================================
 
@@ -802,6 +852,10 @@ if __name__ == '__main__':
                     optSet.tab_connexions, optSet.seriesSynParam)
         writeTitres(folders, 'synFR', optSet.allPhasesSynFR,
                     optSet.tab_connexionsFR, optSet.seriesSynFRParam)
+        print "fourchetteStim:", optSet.fourchetteStim
+        print "fourchetteSyn", optSet.fourchetteSyn
+        print "cmaes_sigma", optSet.cmaes_sigma
+        print "seuilMSEsave", optSet.seuilMSEsave
 
         # ###################################################################
         # setMusclesandSpindles()
@@ -811,20 +865,20 @@ if __name__ == '__main__':
         # execMarquez()
         # ###################################################################
 
-        # initializeLoeb()
         # ###################################################################
-        # execLoeb()
+        # initializeExecLoeb()
+        # continueLoeb(nbepoch = 1)
         # ###################################################################
 
         """
         optSet.fourchetteStim = 100
         optSet.fourchetteSyn = 100
-        optSet.cmaes_sigma = 0.35
+        optSet.cmaes_sigma = 0.1
         optSet.seuilMSEsave = 100
         """
         # ###################################################################
         # execCMAe(nbevals=500)
-        # FinalModelfromCMAeMinAsimFiles(model, cmaeNb=4)
+        # FinalModelfromCMAeMinAsimFiles(model, cmaeNb=18)
         # ###################################################################
 
 

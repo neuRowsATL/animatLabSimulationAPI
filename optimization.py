@@ -106,6 +106,9 @@ modified October 12, 2017 (D.Cataert):
 modified October 12, 2017 (D.Cataert):
     getSimSetFromAsim modified so that synapses and externalStimuli arrays are
     printed only if "affiche" param is set to 1
+modified October 16, 2017 (D.Cataert):
+    in procedure tablo() the first row are labels, next rows are values
+    procedure extractCol() modified to read only values
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -132,7 +135,7 @@ from cma import fmin
 import datetime
 
 global verbose
-verbose = 3  # niveau de dialogue avec la machine
+verbose = 0  # niveau de dialogue avec la machine
 
 # Define callback function before the __main__ loop in order to ensure that
 # it has global scope. Defining it within the __main__ loop will result in
@@ -724,7 +727,6 @@ def tablo(folders, filename):
                 break
             else:
                 tab1 = getValuesFromText(txt)
-                """
                 if i == 0:
                     tab2 = tab1
                 else:
@@ -739,6 +741,7 @@ def tablo(folders, filename):
                 except:
                     k = 0
                     # print
+                """
                 i = i+1
         f.close()
     return tabfinal
@@ -919,7 +922,10 @@ def extract(table, col, lineStart, lineEnd):
 def extractCol(table, col):
     res = []
     for i in range(len(table)):
-        res.append(table[i][col])
+        try:
+            res.append(float(table[i][col]))
+        except:
+            None
     return res
 
 
@@ -1111,6 +1117,15 @@ def copyFile(filename, src, dst):
     shutil.copy(sourcefile, destfile)
 
 
+def copyFileWithExt(sourceDir, destDir, ext):
+    for basename in os.listdir(sourceDir):
+        if basename.endswith(ext):
+            print basename
+            pathname = os.path.join(sourceDir, basename)
+            if os.path.isfile(pathname):
+                shutil.copy2(pathname, destDir)
+
+
 def copyRenameFile(sourcedir, filesource,
                    destdir, filedest, comment, replace):
     if not os.path.exists(destdir):
@@ -1218,6 +1233,24 @@ def savefileincrem(name, directory, tab, comment):
     else:
         print "no chart"
     return filename
+
+
+def createSubDirIncrem(destDir, destSubDir):
+    number = 0
+    txtnumber = "00"
+    if not os.path.exists(destDir):
+        os.makedirs(destDir)
+    destdirname = destDir + destSubDir + "-00"
+    while os.path.exists(destdirname):
+        number = number + 1
+        if number < 10:
+            txtnumber = "0" + str(number)
+        else:
+            txtnumber = str(number)
+        destdirname = destDir + destSubDir + "-" + txtnumber
+    os.makedirs(destdirname)
+    print destdirname
+    return destdirname + "/"
 
 
 def writeaddTab(folders, tab, filename, mode, comment, flag):
@@ -1510,6 +1543,7 @@ def comparetests(folders, model, optSet, step,
 
     global initialvalue
     txtchart = []
+    chosen = "base"
     # improved = 0
     # bestfitCoact = 100000.
     minus = tablo(folders, findTxtFileName(model, optSet, 1))
@@ -1555,6 +1589,7 @@ def comparetests(folders, model, optSet, step,
             initialvalue = value_base
             finalAngle = base[optSet.lineEnd][optSet.mvtcolumn]
             bestfitCoact = coact_base
+            chosen = "base"
     else:
         if quality_minus == quality_plus:
             stop = 1
@@ -1563,6 +1598,7 @@ def comparetests(folders, model, optSet, step,
             initialvalue = value_base
             finalAngle = plus[optSet.lineEnd][optSet.mvtcolumn]
             bestfitCoact = coact_base
+            chosen = "base"
             # if this parameter has no effect then stop trying it
 
     # creation of a dictionnary for quality values
@@ -1585,6 +1621,7 @@ def comparetests(folders, model, optSet, step,
                 bestfitCoact = coact_plus
                 bestvalue = value_plus
                 txtchart = plus
+                chosen = "plus"
         elif sortQuality[0][0] == 'quality_minus':
             initialvalue = value_minus
             finalAngle = minus[optSet.lineEnd][optSet.mvtcolumn]
@@ -1595,6 +1632,7 @@ def comparetests(folders, model, optSet, step,
                 bestfitCoact = coact_minus
                 bestvalue = value_minus
                 txtchart = minus
+                chosen = "minus"
         else:  # sortQuality[0][0]=='quality_base': # best quality is the first
             initialvalue = value_base
             if step == 0:
@@ -1608,6 +1646,7 @@ def comparetests(folders, model, optSet, step,
                 bestfit = quality_base
                 bestfitCoact = coact_base
                 bestvalue = value_base
+                chosen = "base"
                 if step == 0:
                     txtchart = base
 
@@ -1625,7 +1664,7 @@ def comparetests(folders, model, optSet, step,
         bestvalue = value_base
         bestfit = 10000
     print "final angle : {}".format(finalAngle)
-    res = [bestvalue, bestfit, stop, txtchart, bestfitCoact]
+    res = [bestvalue, bestfit, stop, txtchart, bestfitCoact, chosen]
     return res
 
 
@@ -1706,6 +1745,7 @@ def improveStimparam(folders, model, optSet, projMan, simSet,
                                    bestfit, bestfitCoact)
         bestvalue, bestfit, stop = result[0], result[1], result[2]
         txtchart, bestfitCoact = result[3], result[4]
+        # chosen = result[5]
 
         if stop:
             print "ineffective parameter => abandon improving"
@@ -1849,6 +1889,8 @@ def improveSynparam(folders, model, optSet, projMan, simSet,
                                   bestsynfit, bestsynfitCoact)
         bestsynvalue, bestsynfit, stop = result[0], result[1], result[2]
         txtchart, bestsynfitCoact = result[3], result[4]
+        # chosen = result[5]
+
         if stop:
             print "ineffective parameter => abandon improving"
             step = optSet.nbsteps  # stop trying improvement with this param

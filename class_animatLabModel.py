@@ -33,7 +33,7 @@ from FoldersArm import FolderOrg
 import xml.etree.ElementTree as elementTree
 
 global verbose
-verbose = 3
+verbose = 0
 
 # # ===== ===== ===== ===== =====
 # # ===== ===== ===== ===== =====

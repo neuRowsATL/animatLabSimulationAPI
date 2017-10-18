@@ -283,7 +283,7 @@ class OptimizeSimSettings():
         self.allPhasesSynFR = [self.totalsynFR]
 
         # CMAe parameters
-        self.seuilMSEsave = 35
+        self.seuilMSEsave = 100
         self.x0, self.realx0 = [], []
         self.lower, self.upper = [], []
         self.reallower, self.realupper = [], []
