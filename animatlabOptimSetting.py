@@ -1,19 +1,34 @@
 # -*- coding: utf-8 -*-
 """
+version 17
 Created on Wed Mar 01 10:25:16 2017
-Command board to select stimuli and synapses to optimize
-version 14
+Class that contains all parameters, stimuli and synapses for optimization
 @author: cattaert
+Modified by cattaert June 08 2017
+     Disabled list of synapses corrected line 492 & line 510
+
+Modified by cattaert September 1, 2017:
+    added handling of motorStims (self.motorStimuli, self.nbmotors,
+    self.tab_motors)(in progress)
+Modified September 21, 2017 (D; Cattaert)
+    self.folders created to allow its use in "actualizeparamLoeb" procedure
+    now the template is saved in the "finalModel" folder
+modified November 03, 2017 (D.Cataert):
+    A distinction is now made between self.synList (connexions to
+    be modified by optimization processes and self.synsTot (that concerns all
+    connexions)
 """
 
 import random
-
+from math import pi
 import class_animatLabModel as AnimatLabModel
 import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 from optimization import liste, findFirstType
-from optimization import affichChartColumn, affichExtStim, affichNeurons
-from optimization import affichConnexions, affichNeuronsFR, affichConnexionsFR
+from optimization import affichChartColumn, affichExtStim
+from optimization import affichMotor
+from optimization import affichNeurons, affichNeuronsFR
+from optimization import affichConnexions, affichConnexionsFR
 from optimization import enableStims, formTemplateSmooth, savecurve
 
 from FoldersArm import FolderOrg
@@ -37,18 +52,51 @@ class OptimizeSimSettings():
                  paramMarquezValue=[1, 2], paramMarquezType=[int, int],
                  paramMarquezCoul=['white', 'white']):
 
+        self.folders = folders
         self.model = model
         self.projMan = projMan
         self.sims = sims
         self.pkFileName = pkFileName
         self.paramFicName = folders.animatlab_result_dir + self.pkFileName
         self.chart = model.getElementByType("Chart")
+        self.chartName = []
+        for ch in list(self.chart):
+            self.chartName.append(ch.find("Name").text)
+        self.selectedChart = 0
         self.collectInterval = self.chart[0].find("CollectInterval").text
         self.rateAsim = int(1/float(self.collectInterval))
         self.rate = self.rateAsim
         self.chartStart = float(self.chart[0].find("StartTime").text)
-        self.ChartColumns = model.getElementByType("ChartcolName")
+        self.ChartColumns = model.getElementByType("ChartCol0")
         self.ExternalStimuli = model.getElementByType("ExternalStimuli")
+        self.motorP = model.getElementByType("MotorPosition")
+        self.motorV = model.getElementByType("MotorVelocity")
+        self.motorStimuli = [self.motorP, self.motorV]
+        self.joints = model.getElementByType("Joint")
+        self.jointName = []
+        self.jointType = []
+        self.jointLimUp = []
+        self.jointLimDwn = []
+        print "\n optSet: ANALYZING body segments and joints..."
+        for jointNb in range(len(self.joints)):
+            self.jointName.append(self.joints[jointNb].find("Name").text)
+            print self.jointName[jointNb],
+            self.jointType.append(self.joints[jointNb].find("Type").text)
+            print self.jointType[jointNb],
+            if self.jointType[jointNb] != "Hinge":
+                print "No limits found"
+                self.jointLimUp.append(0)
+                self.jointLimDwn.append(0)
+            else:
+                print "limits (deg) :",
+                limDwn = self.joints[jointNb].find("LowerLimit")
+                self.jointLimDwn.append(float(limDwn.find("LimitPos").text))
+                angle = self.jointLimDwn[jointNb] * 180 / pi
+                print "{:3.2f}".format(angle), "\t -->",
+                limUp = self.joints[jointNb].find("UpperLimit")
+                self.jointLimUp.append(float(limUp.find("LimitPos").text))
+                angle = self.jointLimUp[jointNb] * 180 / pi
+                print "{:3.2f}".format(angle)
         self.Neurons = model.getElementByType("Neurons")
         self.NeuronsFR = model.getElementByType("NeuronsFR")
         self.Adapters = model.getElementByType("Adapters")
@@ -56,20 +104,24 @@ class OptimizeSimSettings():
         self.SynapsesFR = model.getElementByType("SynapsesFR")
         self.Connexions = model.getElementByType("Connexions")
         self.nbStims = len(self.ExternalStimuli)
+        self.nbmotors = len(self.motorP) + len(self.motorV)
         self.nbNeurons = len(self.Neurons)
         self.nbAdapters = len(self.Adapters)
         self.nbSynapses = len(self.Synapses)
         self.nbConnexions = len(self.Connexions)
         self.nbNeuronsFR = len(self.NeuronsFR)
         self.nbSynapsesFR = len(self.SynapsesFR)
+        self.tab_motors = affichMotor(model, self.motorStimuli, 0)
         self.tab_chartcolumns = affichChartColumn(self.ChartColumns, 0)
-        self.tab_stims = affichExtStim(self.ExternalStimuli, 1)  # 1 for print
-        self.tab_neurons = affichNeurons(self.Neurons, 1)
+        self.tab_stims = affichExtStim(self, self.ExternalStimuli, 0)
+        self.tab_neurons = affichNeurons(self, self.Neurons, 0)
         self.listeNeurons = liste(self.Neurons)
-        self.tab_connexions = affichConnexions(model, self.Connexions, 1)
-        self.tab_neuronsFR = affichNeuronsFR(self.NeuronsFR, 1)  # idem
+        self.tab_connexions = affichConnexions(model, self,
+                                               self.Connexions, 0)
+        self.tab_neuronsFR = affichNeuronsFR(self, self.NeuronsFR, 0)  # idem
         self.listeNeuronsFR = liste(self.NeuronsFR)
-        self.tab_connexionsFR = affichConnexionsFR(model, self.SynapsesFR, 1)
+        self.tab_connexionsFR = affichConnexionsFR(model, self,
+                                                   self.SynapsesFR, 0)
         self.rank_stim = {}
         self.rank_neuron = {}
         self.rank_syn = {}
@@ -84,18 +136,13 @@ class OptimizeSimSettings():
         # this is the file that is loaded to generate AnimatLab model object
         self.projMan.set_aproj(self.model)    # Assign the animatLabModel obj
         self.projMan.set_simRunner(self.sims)    # Assign the simulationSet obj
-        self.chart[0].find("StartTime").text = '0'  # sets chart start to 0
+        # self.chart[0].find("StartTime").text = '0'  # sets chart start to 0
+# TODO: consequences a verifier
+
         # creation of a dictionary to handle column names in the chart file
         for i in range(len(self.tab_chartcolumns)):
             self.rank_chart_col[self.tab_chartcolumns[i][0]] = i + 2
             self.chartColNames.append(self.tab_chartcolumns[i][0])
-        print "#################################"
-        print "chart File"
-        print 'column',  '\t', 'name'
-        for i in range(len(self.rank_chart_col)):
-            print self.rank_chart_col[self.chartColNames[i]], '\t',
-            print self.chartColNames[i]
-        print "#################################"
 
         # creation of a dictionary "rank_stim" to handle stimulus rank
         self.rank_stim = {}
@@ -130,7 +177,7 @@ class OptimizeSimSettings():
         self.startTwitch = 5.0
         self.endTwitch = 5.1
         self.endTest = 8.0
-        self.twitStMusclesStNbs = [4, 19]
+        self.twitStMusclesStNbs = [0, 1]
         self.sensoryNeuronNbs = []
         self.sensoryNeuronNames = []
         self.motorNeuronNbs = []
@@ -181,6 +228,7 @@ class OptimizeSimSettings():
         self.disabledSynFRNames = []
         self.seriesStimParam = ['CurrentOn']
         self.seriesSynParam = ['G']
+        self.seriesSynNSParam = ['SynAmp']
         self.seriesSynFRParam = ['Weight']
         self.nbepoch = 1
         self.nbstimtrials = 1
@@ -212,8 +260,8 @@ class OptimizeSimSettings():
         self.lineStartTot = int((self.startEQM-self.chartStart)*self.rate)
         self.lineEndTot = int((self.endEQM-self.chartStart)*self.rate)
         self.stimsTot = []
-        self.stimList = []
-        self.listStim = []  # list of stim to be explored in the optimization
+        self.enabledstimList = []
+        self.stimList = []  # list of stim to be explored in the optimization
         self.orderedstimsTot = []
         self.shuffledstimsTot = []
         self.total = [self.stimsTot, self.shuffledstimsTot,
@@ -243,8 +291,10 @@ class OptimizeSimSettings():
         self.allPhasesSynFR = [self.totalsynFR]
 
         # CMAe parameters
-        self.x0 = []
+        self.seuilMSEsave = 100
+        self.x0, self.realx0 = [], []
         self.lower, self.upper = [], []
+        self.reallower, self.realupper = [], []
         self.stimParName = []
         self.synParName = []
         self.synFRParName = []
@@ -256,6 +306,9 @@ class OptimizeSimSettings():
         self.stimName = []
         for i in range(len(self.tab_stims)):
             self.stimName.append(self.tab_stims[i][0])
+        self.motorName = []
+        for i in range(len(self.tab_motors)):
+            self.motorName.append(self.tab_motors[i][0])
         self.connexName = []
         for i in range(len(self.tab_connexions)):
             self. connexName.append(self.tab_connexions[i][0])
@@ -277,76 +330,10 @@ class OptimizeSimSettings():
              self.template] = self.allPhasesStim[phase]
         # here we use only onse phase => phase = 0
         # ################################################################
-        for param in range(len(self.seriesStimParam)):
-            paramName = self.seriesStimParam[param]
-            if paramName == "StartTime":
-                for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][1]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
-                    self.stimParName.\
-                        append(self.tab_stims[listSt[stim]][0] + "." +
-                               paramName)
-                    self.stimMax.append(self.endPos2)
-            elif paramName == "EndTime":
-                for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][2]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.stimMax.append(self.endPos2)
-            elif paramName == "CurrentOn":
-                for stim in range(len(listSt)):
-                    x0stimtmp = self.tab_stims[listSt[stim]][3]
-                    x0stimNorm = x0stimtmp/self.maxStim
-                    self.x0.append(x0stimNorm)
-                    self.lower.append(x0stimNorm -
-                                      abs(x0stimNorm)*self.fourchetteStim)
-                    self.upper.append(x0stimNorm +
-                                      abs(x0stimNorm)*self.fourchetteStim)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.stimMax.append(self.maxStim)
-        for synparam in range(len(self.seriesSynParam)):
-            synparamName = self.seriesSynParam[synparam]
-            if synparamName == 'G':
-                firstConnexion = findFirstType(self.model, "Connexions")
-                for syn in range(len(self.synList)):
-                    rg = self.synList[syn] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synParName.append(temp)
-                    x0syntmp = self.tab_connexions[self.synList[syn]][3]
-                    self.x0.append(x0syntmp/self.maxG)  # 0<G<maxG
-                    self.lower.append((x0syntmp/self.fourchetteSyn)/self.maxG)
-                    self.upper.append((x0syntmp*self.fourchetteSyn)/self.maxG)
-                    self.synMax.append(self.maxG)
-        for synparam in range(len(self.seriesSynFRParam)):
-            synparamName = self.seriesSynFRParam[synparam]
-            if synparamName == "Weight":
-                firstConnexion = findFirstType(self.model, "SynapsesFR")
-                for synFR in range(len(self.synListFR)):
-                    rg = self.synListFR[synFR] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synFRParName.append(temp)
-                    x0syntmp = self.tab_connexionsFR[self.synListFR[synFR]][1]
-                    self.x0.append(x0syntmp/self.maxWeight)
-                    # 0 < Weight < maxWeight
-                    if self.tab_connexionsFR[self.synListFR[synFR]][3] < 0:
-                        self.lower.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                        self.upper.append(0.)
-                    else:
-                        self.lower.append(0.)
-                        self.upper.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                    self.synMax.append(self.maxWeight)
 
     def actualizeparamMarquez(self):
+        print
+        print "optSet: actualizing Marquez params"
         # Creation of a dictionary for Marquez parameter handling
         self.paramMarquez = {}
         i = 0
@@ -382,20 +369,48 @@ class OptimizeSimSettings():
             self.mnColChartNames.append(self.chartColNames[i])
         self.twitStMusclesStNbs = self.paramMarquez['twitStMusclesStNbs']
         self.twitStMusclesStNames = []
+        print "   ======================"
+        print "   twitStMusclesStNb stName"
         for i in self.twitStMusclesStNbs:
-            self.twitStMusclesStNames.append(self.chartColNames[i])
+            self.twitStMusclesStNames.append(self.stimName[i])
+            print "   ", i, self.stimName[i]
+        print "   ======================"
         self.nbruns = self.paramMarquez['nbruns']
         self.timeMes = self.paramMarquez['timeMes']
         self.delay = self.paramMarquez['delay']
         self.eta = self.paramMarquez['eta']
 
     def actualizeparamLoeb(self):
+        print
+        print "optSet: actualizing Loeb params"
         # Creation of a dictionary for optimization parameter handling
         self.paramOpt = {}
         i = 0
         for par in (self.paramLoebName):
             self.paramOpt[par] = self.paramLoebValue[i]
             i += 1
+        self.selectedChart = self.paramOpt['selectedChart']
+        typ = "ChartCol" + str(self.selectedChart)
+        self.ChartColumns = self.model.getElementByType(typ)
+        self.tab_chartcolumns = affichChartColumn(self.ChartColumns, 0)
+        self.rank_chart_col = {'TimeSplice': 0, 'Time': 1}  # dictionnary
+        self.chartColNames = ['TimeSplice', 'Time']  # chart column names
+        for i in range(len(self.tab_chartcolumns)):
+            self.rank_chart_col[self.tab_chartcolumns[i][0]] = i + 2
+            self.chartColNames.append(self.tab_chartcolumns[i][0])
+        self.chartStart = float(self.chart[self.selectedChart].
+                                find("StartTime").text)
+        self.collectInterval = self.chart[self.selectedChart].\
+            find("CollectInterval").text
+        self.rateAsim = int(1/float(self.collectInterval))
+        self.rate = self.rateAsim
+        # calculates the chart lines corresponding to time events
+        self.lineStart1 = int((self.startEQM-self.chartStart)*self.rate)
+        self.lineEnd1 = int((self.endPos1-self.chartStart)*self.rate)
+        self.lineStart2 = int((self.endMvt2-self.chartStart)*self.rate)
+        self.lineEnd2 = int((self.endEQM-self.chartStart)*self.rate)
+        self.lineStartTot = int((self.startEQM-self.chartStart)*self.rate)
+        self.lineEndTot = int((self.endEQM-self.chartStart)*self.rate)
         self.mvtcolumn = self.paramOpt['mvtcolumn']
         self.mvtColChartName.append(self.chartColNames[self.mvtcolumn])
         self.startMvt1 = self.paramOpt['startMvt1']
@@ -409,13 +424,24 @@ class OptimizeSimSettings():
         self.startEQM = self.paramOpt['startEQM']
         self.endEQM = self.paramOpt['endEQM']
         self.allstim = self.paramOpt['allstim']
-        self.allsyn = self.paramOpt['allsyn']
+        # self.allsyn = self.paramOpt['allsyn']
+        print "   #################################"
+        print "   chart File : ", self.chartName[self.selectedChart]
+        print '   column',  '\t', 'name'
+        for i in range(len(self.rank_chart_col)):
+            print "   ",
+            print self.rank_chart_col[self.chartColNames[i]], '\t',
+            print self.chartColNames[i]
+        print "   #################################"
+
         self.mvtTemplate = formTemplateSmooth(self.rate, self.startMvt1,
                                               self.endMvt1, self.angle1,
                                               self.startMvt2, self.endMvt2,
                                               self.angle2, self.endPos2)
         savecurve(self.mvtTemplate,
-                  folders.animatlab_result_dir, "template.txt")
+                  self.folders.animatlab_result_dir, "template.txt")
+        print "   mvtTemplate.txt saved in",
+        print self.folders.animatlab_result_dir
         # ##############################################################
         #   Selection of "dontChange" & "disabled" for Optimization    #
         # ##############################################################
@@ -436,7 +462,7 @@ class OptimizeSimSettings():
         self.disabledSynNames = []
         for i in self.disabledSynNbs:
             self.disabledSynNames.append(self.connexName[i])
-        
+
         self.dontChangeSynFRNbs = self.paramOpt['dontChangeSynFRNbs']
         self.dontChangeSynFRNames = []
         for i in self.dontChangeSynFRNbs:
@@ -449,34 +475,41 @@ class OptimizeSimSettings():
         self.stimsTot = []
         for i in range(len(self.tab_stims)):
             self.stimsTot.append(i)    # selects all stimulis
-        self.stimList = []
+        self.enabledstimList = []
         for stim in range(len(self.stimsTot)):
             stimRank = self.stimsTot[stim]
             if stimRank not in self.disabledStimNbs:
-                self.stimList.append(stimRank)
+                self.enabledstimList.append(stimRank)
         # enabled external stimuli --> 'true'
-        enableStims(self.ExternalStimuli, self.stimList)
-        print "\n enabled external stimuli set to 'true'",
-        print "and excluded to 'false'"
-        self.listStim = []  # list of stim to be explored in the optimization
-        for stim in range(len(self.stimList)):
-            stimRank = self.stimList[stim]
+        enableStims(self.ExternalStimuli, self.enabledstimList)
+        print "   optSet : Enabled external stimuli set to 'true'",
+        print "   and excluded to 'false'"
+        # self.tab_stims = affichExtStim(self.ExternalStimuli, 0)
+        #
+        self.stimList = []  # list of stim to be explored in the optimization
+        for stim in range(len(self.enabledstimList)):
+            stimRank = self.enabledstimList[stim]
             if stimRank not in self.dontChangeStimNbs:  # do not includes
-                self.listStim.append(stimRank)           # 'dontChangeStimNbs'
+                self.stimList.append(stimRank)           # 'dontChangeStimNbs'
         # After changing a property, save the updated model
-        self.model.saveXML(overwrite=True)   # in the FinalModel dir
-        self.tab_stims = affichExtStim(self.ExternalStimuli, 1)  # 1 for print
-        self.stimsTot = self.listStim  # excluded stims are removed from list
+        # self.model.saveXML(overwrite=True)   # in the FinalModel dir
+        # self.tab_stims = affichExtStim(self.ExternalStimuli, 1)
+        # self.stimList  : list without disabled stims and dontChangeStims
         self.orderedstimsTot = []
-        for i in range(len(self.stimsTot)):
+        for i in range(len(self.stimList)):
             self.orderedstimsTot.append(i)
         self.shuffledstimsTot = random.sample(self.orderedstimsTot,
                                               len(self.orderedstimsTot))
-        self.total = [self.stimsTot, self.shuffledstimsTot,
+        self.total = [self.stimList, self.shuffledstimsTot,
                       self.lineStartTot, self.lineEndTot, self.mvtTemplate]
         self.allPhasesStim = [self.total]
 
         # ###########   Connexions   #########################
+        self.tab_motors = affichMotor(self.model, self.motorStimuli, 0)
+        self.tab_chartcolumns = affichChartColumn(self.ChartColumns, 0)
+        self.tab_stims = affichExtStim(self, self.ExternalStimuli, 0)
+        self.tab_neurons = affichNeurons(self, self.Neurons, 0)
+        self.tab_neuronsFR = affichNeuronsFR(self, self.NeuronsFR, 0)
         self.synsTot, self.synsTotFR = [], []
         # --------------------------------------
         # Synapses between 'voltage' neurons
@@ -486,15 +519,15 @@ class OptimizeSimSettings():
         self.synList = []
         for syn in range(len(self.synsTot)):
             synRank = self.synsTot[syn]
-            if synRank not in self.dontChangeSynNbs:
+            if synRank not in self.disabledSynNbs + self.dontChangeSynNbs:
                 self.synList.append(synRank)
-        self.synsTot = self.synList  # excluded syns are removed from the list
+        # self.synList  : list without excluded syns and dontChange syns
         self.orderedsynsTot = []
-        for i in range(len(self.synsTot)):
+        for i in range(len(self.synList)):
             self.orderedsynsTot.append(i)
         self.shuffledsynsTot = random.sample(self.orderedsynsTot,
                                              len(self.orderedsynsTot))
-        self.totalsyn = [self.synsTot, self.shuffledsynsTot,
+        self.totalsyn = [self.synList, self.shuffledsynsTot,
                          self.lineStartTot, self.lineEndTot, self.mvtTemplate]
         # --------------------------------------
         # Synapses between 'rate' neurons
@@ -504,15 +537,15 @@ class OptimizeSimSettings():
         self.synListFR = []
         for syn in range(len(self.synsTotFR)):
             synRank = self.synsTotFR[syn]
-            if synRank not in self.dontChangeSynFRNbs:
+            if synRank not in self.disabledSynFRNbs + self.dontChangeSynFRNbs:
                 self.synListFR.append(synRank)
-        self.synsTotFR = self.synListFR  # excluded syns are removed from list
+        # self.synListFR  : list without excluded synFRs and dontchange synFRs
         self.orderedsynsTotFR = []
-        for i in range(len(self.synsTotFR)):
+        for i in range(len(self.synListFR)):
             self.orderedsynsTotFR.append(i)
         self.shuffledsynsTotFR = random.sample(self.orderedsynsTotFR,
                                                len(self.orderedsynsTotFR))
-        self.totalsynFR = [self.synsTotFR, self.shuffledsynsTotFR,
+        self.totalsynFR = [self.synListFR, self.shuffledsynsTotFR,
                            self.lineStartTot, self.lineEndTot,
                            self.mvtTemplate]
         # for two separate phases
@@ -524,6 +557,7 @@ class OptimizeSimSettings():
         self.allPhasesSynFR = [self.totalsynFR]
         self.seriesStimParam = self.paramOpt['seriesStimParam']
         self.seriesSynParam = self.paramOpt['seriesSynParam']
+        self.seriesSynNSParam = self.paramOpt['seriesSynNSParam']
         self.seriesSynFRParam = self.paramOpt['seriesSynFRParam']
         self.nbepoch = self.paramOpt['nbepoch']
         self.nbstimtrials = self.paramOpt['nbstimtrials']
@@ -547,7 +581,14 @@ class OptimizeSimSettings():
         self.cmaes_sigma = self.paramOpt['cmaes_sigma']
         self.fourchetteStim = self.paramOpt['fourchetteStim']
         self.fourchetteSyn = self.paramOpt['fourchetteSyn']
-
+        self.x0, self.realx0 = [], []
+        self.lower, self.upper = [], []
+        self.reallower, self.realupper = [], []
+        self.stimParName = []
+        self.synParName = []
+        self.synFRParName = []
+        self.stimMax = []
+        self.synMax = []
         # ################################################################
         #                   ATTENTION !!!
         for phase in range(len(self.allPhasesStim)):
@@ -560,70 +601,177 @@ class OptimizeSimSettings():
             paramName = self.seriesStimParam[param]
             if paramName == "StartTime":
                 for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][1]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
-                    self.stimParName.\
-                        append(self.tab_stims[listSt[stim]][0] + "." +
-                               paramName)
-                    self.stimMax.append(self.endPos2)
+                    stimMax = self.endPos2
+                    stimMin = 0
+                    self.stimMax.append(stimMax)
+                    realx0 = self.tab_stims[listSt[stim]][1]
+                    self.realx0.append(realx0)
+                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                        / 100
+                    reallower = max((realx0 - delta), stimMin)
+                    self.reallower.append(reallower)
+                    realupper = min((realx0 + delta), stimMax)
+                    self.realupper.append(realupper)
+                    self.stimParName.append(self.
+                                            tab_stims[listSt[stim]][0] + "." +
+                                            paramName)
+                    self.upper.append(1)
+                    self.lower.append(0)
+                    self.x0.append((realx0-reallower)/(realupper-reallower))
             elif paramName == "EndTime":
                 for stim in range(len(listSt)):
-                    self.x0.append(self.
-                                   tab_stims[listSt[stim]][2]/self.endPos2)
-                    self.lower.append(0.)
-                    self.upper.append(1.)
+                    stimMax = self.endPos2
+                    stimMin = 0
+                    self.stimMax.append(stimMax)
+                    realx0 = self.tab_stims[listSt[stim]][2]
+                    self.realx0.append(realx0)
+                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                        / 100
+                    reallower = max((realx0 - delta), stimMin)
+                    self.reallower.append(reallower)
+                    realupper = min((realx0 + delta), stimMax)
+                    self.realupper.append(realupper)
                     self.stimParName.append(self.
                                             tab_stims[listSt[stim]][0] + "." +
                                             paramName)
-                    self.stimMax.append(self.endPos2)
+                    self.upper.append(1)
+                    self.lower.append(0)
+                    self.x0.append((realx0-reallower)/(realupper-reallower))
             elif paramName == "CurrentOn":
                 for stim in range(len(listSt)):
-                    x0stimtmp = self.tab_stims[listSt[stim]][3]
-                    x0stimNorm = x0stimtmp/self.maxStim
-                    self.x0.append(x0stimNorm)
-                    self.lower.append(x0stimNorm -
-                                      abs(x0stimNorm)*self.fourchetteStim)
-                    self.upper.append(x0stimNorm +
-                                      abs(x0stimNorm)*self.fourchetteStim)
+                    stimMax = self.maxStim
+                    stimMin = - stimMax
+                    self.stimMax.append(stimMax)
+                    realx0 = self.tab_stims[listSt[stim]][3]
+                    self.realx0.append(realx0)
+                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                        / 100
+                    reallower = max((realx0 - delta), stimMin)
+                    self.reallower.append(reallower)
+                    realupper = min((realx0 + delta), stimMax)
+                    self.realupper.append(realupper)
                     self.stimParName.append(self.
                                             tab_stims[listSt[stim]][0] + "." +
                                             paramName)
-                    self.stimMax.append(self.maxStim)
+                    self.upper.append(1)
+                    self.lower.append(0)
+                    self.x0.append((realx0-reallower)/(realupper-reallower))
+
         for synparam in range(len(self.seriesSynParam)):
             synparamName = self.seriesSynParam[synparam]
             if synparamName == 'G':
-                firstConnexion = findFirstType(self.model, "Connexions")
-                for syn in range(len(self.synList)):
-                    rg = self.synList[syn] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synParName.append(temp)
-                    x0syntmp = self.tab_connexions[self.synList[syn]][3]
-                    self.x0.append(x0syntmp/self.maxG)  # 0<G<maxG
-                    self.lower.append((x0syntmp/self.fourchetteSyn)/self.maxG)
-                    self.upper.append((x0syntmp*self.fourchetteSyn)/self.maxG)
-                    self.synMax.append(self.maxG)
+                if self.tab_connexions != []:
+                    firstConnexion = findFirstType(self.model, "Connexions")
+                    for syn in range(len(self.synList)):
+                        if self.tab_connexions[syn][5] == 'SpikingChemical':
+                            rg = self.synList[syn] + firstConnexion
+                            temp = self.model.lookup["Name"][rg] +\
+                                "." + synparamName
+                            self.synParName.append(temp)
+                            synMax = self.maxG
+                            synMin = 0
+                            self.synMax.append(synMax)
+                            realx0 = self.tab_connexions[self.synList[syn]][3]
+                            self.realx0.append(realx0)
+                            delta = float(synMax - synMin) *\
+                                self.fourchetteSyn / 100
+                            reallower = max((realx0 - delta), synMin)
+                            self.reallower.append(reallower)
+                            realupper = min((realx0 + delta), synMax)
+                            self.realupper.append(realupper)
+                            self.upper.append(1)
+                            self.lower.append(0)
+                            self.x0.append((realx0-reallower) /
+                                           (realupper-reallower))
+
+        for synparam in range(len(self.seriesSynNSParam)):
+            synparamName = self.seriesSynNSParam[synparam]
+            if synparamName == 'SynAmp':
+                if self.tab_connexions != []:
+                    if self.tab_connexions[syn][5] == 'NonSpikingChemical':
+                        synMax = self.maxSynAmp
+                        tabvalrealsynxO = []
+                        for syn in self.synList:
+                            realx0 = self.tab_connexions[syn][1]
+                            tabvalrealsynxO.append(realx0)
+                        maxval = max(tabvalrealsynxO)
+                        if maxval > synMax:
+                                synMax = maxval
+                                self.maxSynAmp = maxval
+                                print "WARNING: SynAmp larger than synMax..."
+                        for syn in self.synList:
+                            synapseTempID = self.Connexions[syn].\
+                                find("SynapseTypeID").text
+                            synapseTempName = self.model.\
+                                getElementByID(synapseTempID).\
+                                find("Name").text
+                            temp = synapseTempName + "." + synparamName
+                            self.synParName.append(temp)
+                            synMin = 0
+                            self.synMax.append(synMax)
+                            realx0 = self.tab_connexions[syn][1]
+                            self.realx0.append(realx0)
+                            delta = float(synMax - synMin) *\
+                                self.fourchetteSyn / 100
+                            reallower = max((realx0 - delta), synMin)
+                            self.reallower.append(reallower)
+                            realupper = min((realx0 + delta), synMax)
+                            self.realupper.append(realupper)
+                            self.upper.append(1)
+                            self.lower.append(0)
+                            self.x0.append((realx0-reallower) /
+                                           (realupper-reallower))
+
         for synparam in range(len(self.seriesSynFRParam)):
             synparamName = self.seriesSynFRParam[synparam]
             if synparamName == "Weight":
-                firstConnexion = findFirstType(self.model, "SynapsesFR")
-                for synFR in range(len(self.synListFR)):
-                    rg = self.synListFR[synFR] + firstConnexion
-                    temp = self.model.lookup["Name"][rg] + "." + synparamName
-                    self.synFRParName.append(temp)
-                    x0syntmp = self.tab_connexionsFR[self.synListFR[synFR]][1]
-                    self.x0.append(x0syntmp/self.maxWeight)
-                    # 0 < Weight < maxWeight
-                    if self.tab_connexionsFR[self.synListFR[synFR]][3] < 0:
-                        self.lower.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                        self.upper.append(0.)
-                    else:
-                        self.lower.append(0.)
-                        self.upper.append(self.fourchetteSyn *
-                                          x0syntmp/self.maxG)
-                    self.synMax.append(self.maxWeight)
+                if self.tab_connexionsFR != []:
+                    firstConnexion = findFirstType(self.model, "SynapsesFR")
+                    for synFR in range(len(self.synListFR)):
+                        rg = self.synListFR[synFR] + firstConnexion
+                        temp = self.model.lookup["Name"][rg] +\
+                            "." + synparamName
+                        self.synFRParName.append(temp)
+                        synMax = self.maxWeight
+                        synMin = 0
+                        self.synMax.append(synMax)
+                        realx0 = self.tab_connexionsFR[self.
+                                                       synListFR[synFR]][1]
+                        self.realx0.append(realx0)
+                        delta = float(synMax - synMin) *\
+                            self.fourchetteSyn / 100
+                        reallower = max((realx0 - delta), synMin)
+                        self.reallower.append(reallower)
+                        realupper = min((realx0 + delta), synMax)
+                        self.realupper.append(realupper)
+                        self.upper.append(1)
+                        self.lower.append(0)
+                        self.x0.append((realx0-reallower) /
+                                       (realupper-reallower))
+
+    def update_optSetParamLoeb(self):
+        """
+        This procedure adapts paramLoeb to upgraded version that includes
+        seriesSynNSParam and in which "allsyns" has been removed
+        """
+        self.paramLoebName[16] = self.paramLoebName[17]
+        self.paramLoebType[16] = self.paramLoebType[17]
+        self.paramLoebValue[16] = self.paramLoebValue[17]
+        self.paramLoebName[17] = self.paramLoebName[18]
+        self.paramLoebType[17] = self.paramLoebType[18]
+        self.paramLoebValue[17] = self.paramLoebValue[18]
+        self.paramLoebName[18] = self.paramLoebName[19]
+        self.paramLoebType[18] = self.paramLoebType[19]
+        self.paramLoebValue[18] = self.paramLoebValue[19]
+        self.paramLoebName[19] = self.paramLoebName[20]
+        self.paramLoebType[19] = self.paramLoebType[20]
+        self.paramLoebValue[19] = self.paramLoebValue[20]
+        self.paramLoebName[20] = self.paramLoebName[21]
+        self.paramLoebType[20] = self.paramLoebType[21]
+        self.paramLoebValue[20] = self.paramLoebValue[21]
+        self.paramLoebName[21] = 'seriesSynNSParam'
+        self.paramLoebType[21] = list
+        self.paramLoebValue[21] = ['SynAmp']
 
     def printParams(self, paramName, paramValue):
         for rg in range(len(paramValue)):

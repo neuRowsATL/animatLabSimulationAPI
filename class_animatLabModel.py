@@ -3,6 +3,29 @@ Created by:     Bryce Chung (neuRowsATL)
 Last Modified:  May 20, 2016 (version 3)
 
 Description: This class opens and saves AnimatLab models from .aproj files.
+Modified August 23 2017 Daniel Cattaert
+    ActualizeAproj now include StartTime and EndTime of externalStimuli
+
+modified September 19, 2017 (D. Cattaert, C. Halgand):
+    procedure saveXML modified to avoid problems whith "." in path
+        if overwrite:
+            if fileName == '':
+                fileName = self.asimFile
+            else:
+                fileName = os.path.join(os.path.dirname(self.asimFile),
+                                        os.path.splitext(fileName)[0]+'.asim')
+        else:
+            saveDir = os.path.dirname(self.asimFile)
+            rootName = os.path.basename(os.path.splitext(self.asimFile)[0])
+            oldname = rootName + '*.asim'
+            ix = len(glob.glob(os.path.join(saveDir, oldname)))
+            newname = rootName + '-%i.asim' % ix
+            fileName = os.path.join(saveDir, newname)
+    procedure saveXMLaproj changed in the same way
+modified November 09, 2017 (D. Cattaert):
+    class AnimatLabSimFile has been completed to include motor elements
+    for getElementByType("MotorPosition") and getElementByType("MotorVelocity")
+    These facilities are used in "optimization.py" in affichMotor() function
 """
 
 # Import dependencies
@@ -14,7 +37,7 @@ from FoldersArm import FolderOrg
 import xml.etree.ElementTree as elementTree
 
 global verbose
-verbose = 3
+verbose = 0
 
 # # ===== ===== ===== ===== =====
 # # ===== ===== ===== ===== =====
@@ -97,18 +120,18 @@ class AnimatLabModel(object):
             aprojFile = glob.glob(os.path.join(self.projectFolder, '*.aproj'))
             if len(aprojFile) == 0:
                 error = "No AnimatLab project file exists with extension " \
-                        "*.aproj in folder:\n%s" +\
-                        "\n\nCheck AnimatLab project folder for consistency."
+                        "*.aproj in folder:  %s" +\
+                        "  Check AnimatLab project folder for consistency."
                 raise AnimatLabModelError(error % self.projectFolder)
             elif len(aprojFile) > 1:
                 error = "Multiple AnimatLab aproj files exist with extension" \
-                        " *.aproj in folder:\n%s" +\
-                        "\n\nCheck AnimatLab project folder for consistency."
+                        " *.aproj in folder: %s" +\
+                        "  Check AnimatLab project folder for consistency."
                 raise AnimatLabModelError(error % self.projectFolder)
 
             self.aprojFile = aprojFile[0]
             aprojFile = os.path.split(self.aprojFile)[-1]
-            projectFileName = aprojFile.split('.')[0]
+            projectFileName = os.path.splitext(aprojFile)[0]
             self.aprojFile = os.path.join(self.projectFolder, aprojFile)
 
             if asimFile != '':
@@ -133,15 +156,15 @@ class AnimatLabModel(object):
                 elif len(glob.glob(os.path.join(
                                     self.projectFolder, '*.asim'))) == 0:
                     error = "No standalone simulation file exists with " \
-                            "extension *.asim in folder:\n%s" \
-                            "\n\nGenerate a standalone simulation file from " \
+                            "extension *.asim in folder: %s" \
+                            "  Generate a standalone simulation file from " \
                             "the AnimatLab GUI"
                     txt = error % self.projectFolder
                     raise AnimatLabModelError(txt)
                 else:
                     error = "Multiple simulation files exist with extension "\
-                            "*.asim in folder\n%s" +\
-                            "\n\nDelete duplicates and leave one file or "\
+                            "*.asim in folder %s" +\
+                            "  Delete duplicates and leave one file or "\
                             "initiate AnimatLabModel object with ASIM file "\
                             "specified"
                     raise AnimatLabModelError(error)
@@ -205,10 +228,84 @@ class AnimatLabModel(object):
             lookupName.append(sname + "*" + tname)
             lookupElement.append(el)
 
+        ######################################################################
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        def analyzeChilbodies(rb, level):
+            txt = ""
+            rbfound = 0
+            chrblist = []
+            for n in range(level):
+                txt += "\t"
+            # print txt, level, rb, rb.find("Name").text
+            el = rb.find("Joint")
+            if el is not None:
+                print txt + el.find("Name").text
+                lookupAppend(el, "Joint")
+            elt = rb.find("ChildBodies")
+            if elt is not None:
+                rbfound = 1
+                chrblist = list(elt)
+            # if rbfound == 0:
+            #     print txt + "No childbodies"
+            # if rbfound == 1:
+            #     print txt + "childbodies found",
+            #     print txt, level, chrblist
+            return [rbfound, chrblist]
+
         print "\nREADING .asim elements..."
 
-        # for el in root.find("ExternalStimuli").getchildren():
-        #    lookupAppend(el, "ExternalStimuli")
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        level = 0
+        rbfound = 0
+        subfound = 0
+        childRbNb = 0
+        nbsub = 1  # the firt list of rigid bodies
+        subchrblist = []
+        path = "Environment/Organisms"
+        organisms = list(root.find(path))
+        for organism in organisms:
+            for rigidbodyelmt in list(organism.find("RigidBody")):
+                # print rigidbodyelmt
+                if list(rigidbodyelmt) != []:
+                    # print list(rigidbodyelmt)
+                    subfound = 1
+                    rbeltlist = list(rigidbodyelmt)
+                    subchrblist.append(rbeltlist)
+                    childRbNb = 0
+                    # number of child RigidBodies
+
+                    while subfound:
+                        for ch in range(nbsub):
+                            childRbNb = 0
+                            subfound = 0  # flag to indicate a child rb exists
+                            # first looks for all childbodies from same parent
+                            for rb in subchrblist[level+ch]:
+                                [rbfound, chrblist] = analyzeChilbodies(rb,
+                                                                        level)
+                                if rbfound:
+                                    childRbNb += 1
+                                    subfound = 1
+                                    # each time childbodies are found, the list
+                                    # is added to the subchrblist
+                                    subchrblist.append(chrblist)
+                                nbsub = childRbNb
+                                # ... continues the analysis of the parent
+                            if subfound:    # once the parent has been scaned,
+                                level += 1  # and childbodies found, each child
+                                # becomes parent: the process starts again
+        ######################################################################
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorPosition":
+                lookupAppend(el, "MotorPosition")
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorVelocity":
+                lookupAppend(el, "MotorVelocity")
 
         for el in list(root.find("ExternalStimuli")):
             if el.find("Type").text == "Current":
@@ -220,7 +317,7 @@ class AnimatLabModel(object):
         """
         # modified by Daniel Cattaert May 2016
         in order to allow this module to work when a second organism is added
-        the three lines above have been replaced in the three next lines by
+        the three lines above have been replaced in the three next lines
         """
 
         path = "Environment/Organisms"
@@ -276,10 +373,19 @@ class AnimatLabModel(object):
         for el in list(root.find("DataCharts")):
             lookupAppend(el, "Chart")
 
+        """
         path = "DataCharts/DataChart/DataColumns"
         modules = list(root.find(path))
         for el in modules:
-                lookupAppend3(el, "ChartcolName")
+            lookupAppend3(el, "ChartcolName")
+        """
+        ch = 0
+        for module in list(root.find("DataCharts")):
+            print module.find("Name").text
+            for el in list(module.find("DataColumns")):
+                typ = "ChartCol" + str(ch)
+                lookupAppend3(el, typ)
+            ch += 1
 
         path = "Environment/Organisms"
         organisms = list(root.find(path))
@@ -314,8 +420,7 @@ class AnimatLabModel(object):
         self.lookup["ID"] = lookupID
         self.lookup["Name"] = lookupName
         self.lookup["Element"] = lookupElement
-
-
+        #
 
         # ===============================================
         # Set up lookup table for aproj model elements
@@ -424,7 +529,7 @@ class AnimatLabModel(object):
                     elif cn.split('.')[-1] == "PhysicalToNodeAdapter":
                         # print el.find("Text").text,
                         aprojlookupAppendNode(el, "Adapters")
-       #  print
+        # print
 
         # print "Symapses types"
         path = "Simulation/Environment/Organisms"
@@ -646,9 +751,28 @@ class AnimatLabModel(object):
         Last updated:   December 28, 2015
         Modified by:    Bryce Chung
         """
+        if overwrite:
+            if fileName == '':
+                fileName = self.asimFile
+            else:
+                fileName = os.path.join(os.path.dirname(self.asimFile),
+                                        os.path.splitext(fileName)[0]+'.asim')
+        else:
+            saveDir = os.path.dirname(self.asimFile)
+            rootName = os.path.basename(os.path.splitext(self.asimFile)[0])
+            oldname = rootName + '*.asim'
+            ix = len(glob.glob(os.path.join(saveDir, oldname)))
+            newname = rootName + '-%i.asim' % ix
+            fileName = os.path.join(saveDir, newname)
+        """
+        print "----------------------------------"
+        print 'asimFile', self.asimFile
+        print 'fileName', fileName
+        print 'overwrite', overwrite
         if fileName == '':
             if overwrite:
                 fileName = self.asimFile
+                print '--fileName', fileName
             else:
                 saveDir = os.path.split(self.asimFile)[0]
                 rootName = os.path.split(self.asimFile)[-1].split('.')[0]
@@ -656,7 +780,11 @@ class AnimatLabModel(object):
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
                 newname = rootName + '-%i.asim' % ix
                 fileName = os.path.join(saveDir, newname)
-
+                print 'saveDir', saveDir
+                print 'rootName', rootName
+                print 'oldName', oldname
+                print 'newName', newname
+                print 'fileName', fileName
         else:
             if overwrite:
                 fileName = os.path.join(os.path.split(self.asimFile)[0],
@@ -668,13 +796,13 @@ class AnimatLabModel(object):
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
                 newname = rootName + '-%i.asim' % ix
                 fileName = os.path.join(saveDir, newname)
-                """
+
                 ix = len(glob.glob(
                     os.path.join(os.path.split(self.asimFile)[0],
                                  fileName.split('.')[0]+'*.asim')))
                 fileName = os.path.join(os.path.split(self.asimFile)[0],
                                         fileName.split('.')[0]+'-%i.asim' % ix)
-                """
+        """
         print 'Saving file: %s' % fileName
         self.tree.write(fileName)
 
@@ -739,9 +867,60 @@ class AnimatLabModel(object):
         # self.tree = elementTree.parse(self.asimFile)    # return to asimfile
         # root = self.tree.getroot()
 
-    def actualizeAproj(self, obj_simSet, aprojSaveDir):
+    def asimtoaproj(self, el, ptVar, pts, simpar, affiche=0):
+        # reads Animatlab Aproj file param value and scale
+        va = el.get("Value")
+        sc = el.get("Scale")
+        ac = el.get("Actual")
+        if simpar == "Value":
+            txt1 = str(ptVar)
+            for k in range(4-(len(txt1)/8)):
+                txt1 += "\t"
+            txt2 = "= " + str(va)
+            for k in range(2-(len(txt2)/8)):
+                txt2 += "\t"
+            if affiche:
+                print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            # Update the AnimatLab element value
+            newValue = pts[ptVar]
+            if sc == 'nano':
+                newActual = newValue * 1e-09
+            elif sc == 'micro':
+                newActual = newValue * 1e-06
+            elif sc == 'milli':
+                newActual = newValue * 1e-03
+            elif sc == 'None':
+                newActual = newValue
+        else:
+            txt1 = str(ptVar)
+            for k in range(4-(len(txt1)/8)):
+                txt1 += "\t"
+            txt2 = "= " + str(ac)
+            for k in range(2-(len(txt2)/8)):
+                txt2 += "\t"
+            if affiche:
+                print txt1 + txt2 + ">>\t" + str(pts[ptVar])
+            # Update the AnimatLab element value
+            newActual = pts[ptVar]
+            if sc == 'nano':
+                newValue = newActual / 1e-09
+            elif sc == 'micro':
+                newValue = newActual / 1e-06
+            elif sc == 'milli':
+                newValue = newActual / 1e-03
+            elif sc == 'None':
+                newValue = newActual
+            el.set("Value", str(newValue))
+            el.set("Scale", sc)
+            el.set("Actual", str(newActual))
+
+        el.set("Value", str(newValue))
+        el.set("Scale", sc)
+        el.set("Actual", str(newActual))
+
+    def actualizeAproj(self, obj_simSet, affiche=0):
         for ix, pts in enumerate(obj_simSet.samplePts):
-            print ix, pts
+            # print ix, pts
             for ptVar in pts:
                 # Find the AnimatLab element by name
                 name, param = ptVar.split('.')
@@ -750,74 +929,31 @@ class AnimatLabModel(object):
                 if param == 'G':
                     # ATTENTION!!! Animatlab simfile indique G = Value
                     el = node.find('SynapticConductance')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, va, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, va, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, va, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newValue = pts[ptVar]
-                    if sc == 'nano':
-                        newActual = newValue * 1e-09
-                    elif sc == 'micro':
-                        newActual = newValue * 1e-06
-                    elif sc == 'milli':
-                        newActual = newValue * 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
-                if param == "Weight":
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
+                elif param == 'SynAmp':
+                    # ATTENTION!!! Animatlab simfile indique SynAmp = Value
+                    el = node.find('MaxSynapticConductance')
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
+                elif param == 'ThreshV':
+                    # ATTENTION!!! Animatlab simfile indique ThreshV = Value
+                    el = node.find('PreSynapticThreshold')
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
+                elif param == "Weight":
                     # ATTENTION!!! Animatlab simfile indique Weight = Actual
                     el = node.find('Weight')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, ac, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, ac, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, ac, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newActual = pts[ptVar]
-                    if sc == 'nano':
-                        newValue = newActual / 1e-09
-                    elif sc == 'micro':
-                        newValue = newActual / 1e-06
-                    elif sc == 'milli':
-                        newValue = newActual / 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
                 elif param == 'CurrentOn':
                     # ATTENTION!!! Animatlab simfile indique CurrentOn = Actual
                     el = node.find('CurrentOn')
-                    va = el.get("Value")
-                    sc = el.get("Scale")
-                    ac = el.get("Actual")
-                    if len(ptVar) >= 23:
-                        print "%s = %s >> %s" % (ptVar, ac, pts[ptVar])
-                    elif len(ptVar) < 15:
-                        print "%s = %s \t\t>> %s" % (ptVar, ac, pts[ptVar])
-                    else:
-                        print "%s = %s \t>> %s" % (ptVar, ac, pts[ptVar])
-                    # Update the AnimatLab element value
-                    newActual = pts[ptVar]
-                    if sc == 'nano':
-                        newValue = newActual / 1e-09
-                    elif sc == 'micro':
-                        newValue = newActual / 1e-06
-                    elif sc == 'milli':
-                        newValue = newActual / 1e-03
-                    el.set("Value", str(newValue))
-                    el.set("Scale", sc)
-                    el.set("Actual", str(newActual))
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
+                elif param == 'StartTime':
+                    el = node.find('StartTime')
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
+                elif param == 'EndTime':
+                    el = node.find('EndTime')
+                    self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
 
-    def actualizeAprojStimState(self, asimtab_stims, aprojSaveDir):
+    def actualizeAprojStimState(self, asimtab_stims, affiche=0):
             for extStim in range(len(asimtab_stims)):
                 # Find the AnimatLab element by name
                 name = asimtab_stims[extStim][0]
@@ -826,7 +962,34 @@ class AnimatLabModel(object):
                 node = self.getElementByNameAproj(name)
                 el = node.find('Enabled').text
                 node.find('Enabled').text = str(state)
-                print name, "\t", el, "--->", "\t", state
+                if affiche:
+                    txt1 = str(name)
+                    for k in range(3-(len(txt1)/8)):
+                        txt1 += "\t"
+                    txt2 = str(el) + " ---> "
+                    for k in range(2-(len(txt2)/8)):
+                        txt2 += "\t"
+                    print txt1 + txt2 + str(state)
+                    # print name, "\t", el, "--->", "\t", state
+
+    def actualizeAprojMotorState(self, asimtab_motorst, affiche=0):
+            for motorSt in range(len(asimtab_motorst)):
+                # Find the AnimatLab element by name
+                name = asimtab_motorst[motorSt][0]
+                state = asimtab_motorst[motorSt][5]
+                # print name, state
+                node = self.getElementByNameAproj(name)
+                el = node.find('Enabled').text
+                node.find('Enabled').text = str(state)
+                if affiche:
+                    txt1 = str(name)
+                    for k in range(3-(len(txt1)/8)):
+                        txt1 += "\t"
+                    txt2 = str(el) + " ---> "
+                    for k in range(2-(len(txt2)/8)):
+                        txt2 += "\t"
+                    print txt1 + txt2 + str(state)
+                    # print name, "\t", el, "--->", "\t", state
 
     def saveXMLaproj(self, fileName='', overwrite=False):
         """
@@ -840,33 +1003,36 @@ class AnimatLabModel(object):
         The default file path is the project folder of the AnimatLabAProj
         instantiation.
 
-        Last updated:   February 14, 2017
+        Last updated:   September 19, 2017
         Modified by:    Daniel Cattaert
         """
         if fileName == '':
             if overwrite:
-                fileName = self.aprojFile
+                fileNameOK = self.aprojFile
             else:
                 saveDir = os.path.split(self.aprojFile)[0]
-                rootName = os.path.split(self.aprojFile)[-1].split('.')[0]
+                saveName = os.path.split(self.aprojFile)[-1]
+                rootName = os.path.splitext(saveName)[0]
                 oldname = rootName + '*.aproj'
                 ix = len(glob.glob(os.path.join(saveDir, oldname)))
-                newname = rootName + '-%i.aproj' % ix
-                fileName = os.path.join(saveDir, newname)
+                newname = rootName + '-{0:d}.aproj'.format(ix)
+                fileNameOK = os.path.join(saveDir, newname)
         else:
             if overwrite:
                 saveDir = os.path.split(fileName)[0]
-                ficName = fileName.split('.')[0]+'.aproj'
-                fileName = os.path.join(saveDir, ficName)
+                ficName = os.path.splitext(fileName)[0] + '.aproj'
+                fileNameOK = os.path.join(saveDir, ficName)
             else:
                 saveDir = os.path.split(fileName)[0]
-                ficName = fileName.split('.')[0]+'*.aproj'
+                ficName = os.path.splitext(fileName)[0] + '*.aproj'
                 ix = len(glob.glob(os.path.join(saveDir, ficName)))
-                newname = fileName.split('.')[0]+'-%i.aproj' % ix
-                fileName = os.path.join(saveDir, newname)
+                newname = os.path.splitext(fileName)[0] +\
+                    '-{0:d}.aproj'.format(ix)
+                fileNameOK = os.path.join(saveDir, newname)
 
-        print 'Saving file: %s' % fileName
-        self.aprojtree.write(fileName)
+        print 'Saving file: {}'.format(fileNameOK)
+        self.aprojtree.write(fileNameOK)
+        return fileNameOK
 
 
 class AnimatLabSimFile(object):
@@ -944,8 +1110,84 @@ class AnimatLabSimFile(object):
             lookupName.append(sname + "*" + tname)
             lookupElement.append(el)
 
-        # for el in root.find("ExternalStimuli").getchildren():
-        #    lookupAppend(el, "ExternalStimuli")
+        ######################################################################
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        def analyzeChilbodies(rb, level):
+            txt = ""
+            rbfound = 0
+            chrblist = []
+            for n in range(level):
+                txt += "\t"
+            # print txt, level, rb, rb.find("Name").text
+            el = rb.find("Joint")
+            if el is not None:
+                print txt + el.find("Name").text
+                lookupAppend(el, "Joint")
+            elt = rb.find("ChildBodies")
+            if elt is not None:
+                rbfound = 1
+                chrblist = list(elt)
+            # if rbfound == 0:
+            #     print txt + "No childbodies"
+            # if rbfound == 1:
+            #     print txt + "childbodies found",
+            #     print txt, level, chrblist
+            return [rbfound, chrblist]
+
+        print "\nREADING .asim elements..."
+
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        level = 0
+        rbfound = 0
+        subfound = 0
+        childRbNb = 0
+        nbsub = 1  # the firt list of rigid bodies
+        subchrblist = []
+        path = "Environment/Organisms"
+        organisms = list(root.find(path))
+        for organism in organisms:
+            for rigidbodyelmt in list(organism.find("RigidBody")):
+                # print rigidbodyelmt
+                if list(rigidbodyelmt) != []:
+                    # print list(rigidbodyelmt)
+                    subfound = 1
+                    rbeltlist = list(rigidbodyelmt)
+                    subchrblist.append(rbeltlist)
+                    childRbNb = 0
+                    # number of child RigidBodies
+
+                    while subfound:
+                        for ch in range(nbsub):
+                            childRbNb = 0
+                            subfound = 0  # flag to indicate a child rb exists
+                            # first looks for all childbodies from same parent
+                            for rb in subchrblist[level+ch]:
+                                [rbfound, chrblist] = analyzeChilbodies(rb,
+                                                                        level)
+                                if rbfound:
+                                    childRbNb += 1
+                                    subfound = 1
+                                    # each time childbodies are found, the list
+                                    # is added to the subchrblist
+                                    subchrblist.append(chrblist)
+                                nbsub = childRbNb
+                                # ... continues the analysis of the parent
+                            if subfound:    # once the parent has been scaned,
+                                level += 1  # and childbodies found, each child
+                                # becomes parent: the process starts again
+        ######################################################################
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorPosition":
+                lookupAppend(el, "MotorPosition")
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorVelocity":
+                lookupAppend(el, "MotorVelocity")
 
         for el in list(root.find("ExternalStimuli")):
             if el.find("Type").text == "Current":
@@ -1007,10 +1249,20 @@ class AnimatLabSimFile(object):
         for el in list(root.find("DataCharts")):
             lookupAppend(el, "Chart")
 
+        """
         path = "DataCharts/DataChart/DataColumns"
         modules = list(root.find(path))
         for el in modules:
-                lookupAppend3(el, "ChartcolName")
+            lookupAppend3(el, "ChartcolName")
+        """
+
+        ch = 0
+        for module in list(root.find("DataCharts")):
+            print module.find("Name").text
+            for el in list(module.find("DataColumns")):
+                typ = "ChartCol" + str(ch)
+                lookupAppend3(el, typ)
+            ch += 1
 
         path = "Environment/Organisms"
         organisms = list(root.find(path))
@@ -1120,7 +1372,7 @@ class AnimatLabSimFile(object):
             print "WARNING: No matches found for elements with ID:\n%s" % elID
             return None
 
-
+"""
 if __name__ == '__main__':
     folders = FolderOrg(subdir="ArmSPike13e2")
     folders.affectDirectories()
@@ -1133,3 +1385,4 @@ if __name__ == '__main__':
     if not os.path.exists(aprojSaveDir):
         os.makedirs(aprojSaveDir)
     # model.saveXMLaproj(aprojSaveDir + "ArmSpike13.aproj")
+"""
