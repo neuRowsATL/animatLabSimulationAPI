@@ -58,7 +58,9 @@ Modified August 28,2017 (D. Cattaert):
     to ask for path of the AnimatLabV2 program directory. This path is saved in
     a text file named:"readAnimatLabV2ProgDir.txt" in the working directory.
     If this file exists then the path is red and is no more asked for.
-
+Modified December 04, 2017 (D. Cattaert):
+    Two new button added to modifiy the path of skeleton elements in the aproj
+    file ("Mesh Path" and "SaveNewAproj").
 @author: cattaert
 """
 
@@ -76,10 +78,10 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QSize
 # from PyQt5.QtCore import QDir, Qt
 # from PyQt5.QtGui import QFont, QPalette
-from PyQt5.QtWidgets import (QDialog,
+from PyQt5.QtWidgets import (QDialog, QWidget, QMessageBox,
                              QErrorMessage, QFrame,
                              QGridLayout, QInputDialog, QLabel,
-                             QPushButton)
+                             QPushButton, QVBoxLayout)
 # from PyQt5.QtWidgets import (QApplication, QCheckBox, QColorDialog, QDialog,
 #                              QErrorMessage, QFileDialog, QFontDialog, QFrame,
 #                              QGridLayout, QInputDialog, QLabel, QLineEdit,
@@ -90,6 +92,8 @@ import class_animatLabModel as AnimatLabModel
 import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 from animatlabOptimSetting import OptimizeSimSettings
+import glob
+import xml.etree.ElementTree as elementTree
 from FoldersArm import FolderOrg
 # folders = FolderOrg()
 
@@ -104,6 +108,28 @@ try:
 except AttributeError:
     def _translate(context, text, disambig):
         return QtWidgets.QApplication.translate(context, text, disambig)
+
+
+class GUI_AnimatLabError(Exception):
+    """
+    This class manages errors thrown by the AnimatLabModel class.
+    Right now, this class does nothing other than print an error message.
+    Last updated:   December 28, 2015
+    Modified by:    Bryce Chung
+    """
+    def __init__(self, value):
+        """
+        __init__(value)
+        Set the value of the error message.
+        """
+        self.value = value
+
+    def __str__(self):
+        """
+        __str__()
+        Returns the error message.
+        """
+        return repr(self.value)
 
 
 def readAnimatLabV2ProgDir():
@@ -284,6 +310,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # Connecting pushbuttons. When one button is pressed
         # Execute corresponding function
         self.btnBrowse.clicked.connect(self.browse_folder)
+        self.btnMeshPath.clicked.connect(self.meshPath)
+        self.btnSaveAproj.clicked.connect(self.saveAproj)
         self.btnActualize.clicked.connect(self.miseAjour)
         self.btnSave.clicked.connect(self.saveparamFile)
         self.btnQuit.clicked.connect(self.closeIt)
@@ -320,10 +348,18 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
 
         self.btnBrowse.setText(_translate("MainWindow", "Pick a Folder", None))
         self.btnBrowse.setFont(self.font)
+        self.btnMeshPath.setText(_translate("MainWindow",
+                                            "Mesh Path", None))
+        self.btnMeshPath.setFont(self.font)
+        self.btnMeshPath.setEnabled(False)
+        self.btnSaveAproj.setFont(self.font)
+        self.btnSaveAproj.setEnabled(False)
         self.btnActualize.setText(_translate("MainWindow", "Actualize", None))
         self.btnActualize.setFont(self.font)
+        self.btnActualize.setEnabled(False)
         self.btnSave.setText(_translate("MainWindow", "Save", None))
         self.btnSave.setFont(self.font)
+        self.btnSave.setEnabled(False)
         self.btnQuit.setText(_translate("MainWindow", "Quit", None))
         self.btnQuit.setFont(self.font)
         lab1 = "Don'tChange                     Disable"
@@ -343,6 +379,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.projMan = None
         self.optSet = None
         self.animatLabV2ProgDir = None
+        self.rootname = None
 
     def loadParams(self, paramFicName, listparNameOpt):
         try:
@@ -360,9 +397,20 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             print "nb actual param:", len(listparNameOpt)
             nbloadedpar = len(self.optSet.paramLoebName)
             if nbloadedpar == 42:
-                print "paramOpt :"
-                self.optSet.printParams(self.optSet.paramLoebName,
-                                        self.optSet.paramLoebValue)
+                if self.optSet.paramLoebName[16] == 'disabledSynNbs':
+                    # This is the last version that includes "seriesSynNSParam"
+                    print "paramOpt :"
+                    self.optSet.printParams(self.optSet.paramLoebName,
+                                            self.optSet.paramLoebValue)
+                elif self.optSet.paramLoebName[16] == 'allsyn':
+                    # This is the last version that includes "seriesSynNSParam"
+                    print "this version does not indicate seriesSynNSParam"
+                    print "ACTUALIZING..."
+                    self.optSet.update_optSetParamLoeb()
+                    print "paramOpt :"
+                    self.optSet.printParams(self.optSet.paramLoebName,
+                                            self.optSet.paramLoebValue)
+                    # self.saveparamFile()
                 print "paramMarquez :"
                 self.optSet.printParams(self.optSet.paramMarquezName,
                                         self.optSet.paramMarquezValue)
@@ -399,6 +447,14 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         doc string
         """
         self.close()
+
+    def saveAproj(self):
+        """
+        doc string
+        """
+        aprojFileName = os.path.split(self.model.aprojFile)[-1]
+        aprojSaveDir = self.folders.animatlab_rootFolder + "AprojFiles/"
+        self.model.saveXMLaproj(aprojSaveDir + aprojFileName)
 
     def saveparamFile(self):
         """
@@ -481,8 +537,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynNbs']))
         itm2 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['disabledSynNbs']))
-        self.tableWidget_7.setItem(18, 1, itm1)
-        self.tableWidget_7.setItem(17, 1, itm2)
+        self.tableWidget_7.setItem(17, 1, itm1)
+        self.tableWidget_7.setItem(16, 1, itm2)
 
     def connexFR_cell_was_clicked(self, row, column):
         """
@@ -501,8 +557,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynFRNbs']))
         itm2 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['disabledSynFRNbs']))
-        self.tableWidget_7.setItem(20, 1, itm1)
-        self.tableWidget_7.setItem(19, 1, itm2)
+        self.tableWidget_7.setItem(19, 1, itm1)
+        self.tableWidget_7.setItem(18, 1, itm2)
 
     def neuron_cell_was_clicked(self, row, column):
         """
@@ -745,7 +801,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     item1.setCheckState(QtCore.Qt.Unchecked)
                     # firstChkList[row] = 0
                     # secondChkList[row] = 0
-
         for i in range(len(listName)):
             if firstChkList[i]:
                 firstListNb.append(i)
@@ -763,7 +818,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     thirdListNb.append(i)
         # print "col", col, thirdChkList, "oneChk", oneChk, "thirdNb", thirdNb
         # print "thirdListNb", thirdListNb
-
         return [firstListNb, secondListNb, thirdListNb]
 
     def browse_folder(self):
@@ -773,10 +827,10 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # global folders, sims, model, projman
         # self.listWidget.clear()     # If there are any elements in the list
 
-        animatsimdir = readAnimatLabSimDir()
-        if animatsimdir != "":
-            subdir = os.path.split(animatsimdir)[-1]
-            rootname = os.path.dirname(animatsimdir)
+        self.animatsimdir = readAnimatLabSimDir()
+        if self.animatsimdir != "":
+            subdir = os.path.split(self.animatsimdir)[-1]
+            rootname = os.path.dirname(self.animatsimdir)
             rootname += "/"
         else:
             print "First instance - no previous animatlab folder selected"
@@ -801,7 +855,12 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                                      animatLabV2ProgDir)
             self.folders.affectDirectories()
             saveAnimatLabSimDir(dirname)
-
+            self.dirname = dirname
+            self.rootname = rootname
+            self.btnMeshPath.setEnabled(True)
+            self.btnSaveAproj.setEnabled(True)
+            self.btnActualize.setEnabled(True)
+            self.btnSave.setEnabled(True)
             # ################################################################
             #                  Creation of sims & initialisation             #
             # ################################################################
@@ -832,10 +891,11 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                               'allstim',
                               'disabledStimNbs', 'dontChangeStimNbs',
                               'seriesStimParam',
-                              'allsyn',
                               'disabledSynNbs', 'dontChangeSynNbs',
                               'disabledSynFRNbs', 'dontChangeSynFRNbs',
-                              'seriesSynParam', 'seriesSynFRParam',
+                              'seriesSynParam',
+                              'seriesSynNSParam',
+                              'seriesSynFRParam',
                               'nbepoch', 'nbstimtrials', 'nbsyntrials',
                               'nbsteps',
                               'deltaStimCoeff', 'maxDeltaStim',
@@ -852,9 +912,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                              1,
                              [], [],
                              ['CurrentOn', 'StartTime', 'EndTime'],
-                             1,
                              [], [], [], [],
-                             ['G'], ['Weight'],
+                             ['G'], ['SynAmp'], ['Weight'],
                              2, 1, 1, 4,
                              1.5, 50, 1.5, 50, 1000, -0.06, 0.0001, 2e-08,
                              50, 10, 5e-07, 100000.0, 0.0035, 5, 5]
@@ -865,9 +924,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                               float, float,
                               int,
                               list, list, list,
-                              int,
                               list, list, list, list,
-                              list, list,
+                              list, list, list,
                               int, int, int, int,
                               float, float, float, float, float, float, float,
                               float, float, float, float, float, float,
@@ -1264,6 +1322,20 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.tableWidget_9.resizeColumnsToContents()
         self.tableWidget_9.cellClicked.connect(self.stimPar_cell_was_clicked)
 
+    def meshPath(self):
+        # newMeshPath = ""
+        # nameLabel = QLabel(newMeshPath)
+        # screen = MeshPathForm()
+        # screen.show()
+
+        newMeshPath = QtWidgets.QFileDialog.\
+             getExistingDirectory(self, "Mesh files Path", self.rootname)
+        print newMeshPath
+        meshPathTxt = convertPath2Text(newMeshPath)
+        changeMeshPath(self.folders, self.model, self.dirname, meshPathTxt)
+
+# ==========================================================================
+
 
 def applyType(paramType, strTab):
     """
@@ -1341,6 +1413,77 @@ def saveAnimatLabV2ProgDir(directory):
     fic = open(filename, 'w')
     fic.write(directory)
     fic.close()
+
+
+def convertPath2Text(meshPath):
+    txt = ""
+    for i in range(len(meshPath)):
+        if meshPath[i] == "/":
+            txt += "\\"
+        else:
+            txt += meshPath[i]
+    return txt
+
+
+def changeMeshPath(folders, model, aprojPath, newMeshPath):
+    sp = ""
+
+    def changeDir(oldDir, newMeshPath, meshDir):
+        newPath = newMeshPath[:newMeshPath.find(meshDir)] + \
+                 oldDir[oldDir.find(meshDir):]
+        return newPath
+
+    def findmesh(branch, sp):
+        for elt in branch:
+            print sp + "elt", elt
+            try:
+                meshpath = elt.find("MeshFile").text
+                print sp + meshpath
+                new = changeDir(meshpath, newMeshPath, "MaleSkeleton")
+                elt.find("MeshFile").text = new
+                print sp + new
+            except:
+                pass
+            try:
+                cb = list(elt.find("ChildBodies"))
+                print sp + "childbodies found"
+                sp = sp + "\t"
+                findmesh(cb, sp)
+            except:
+                pass
+
+    folder = aprojPath
+    if folder == '':
+        projectFolder = os.getcwd()
+    else:
+        projectFolder = folder
+    try:
+        # # Check for AnimatLab project file
+        aprojFile = glob.glob(os.path.join(projectFolder, '*.aproj'))
+        if len(aprojFile) == 0:
+            error = "No AnimatLab project file exists with extension " \
+                    "*.aproj in folder:  %s" +\
+                    "  Check AnimatLab project folder for consistency."
+            raise GUI_AnimatLabError(error % projectFolder)
+        elif len(aprojFile) > 1:
+            error = "Multiple AnimatLab aproj files exist with extension" \
+                    " *.aproj in folder: %s" +\
+                    "  Check AnimatLab project folder for consistency."
+            raise GUI_AnimatLabError(error % projectFolder)
+        aprojFile = os.path.split(aprojFile[0])[-1]
+        aprojFile = os.path.join(projectFolder, aprojFile)
+
+    except GUI_AnimatLabError as e:
+        print "Error initializing AnimatLab model object:\n\n %s" % e.value
+        raise
+
+    aprojtree = elementTree.parse(aprojFile)
+    root = aprojtree.getroot()
+    path = "Simulation/Environment/Organisms"
+    organisms = list(root.find(path))
+    for organism in organisms:
+        print organism.find("Name").text
+        findmesh(organism, sp)
 
 
 def main():

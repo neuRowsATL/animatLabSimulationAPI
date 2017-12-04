@@ -109,6 +109,31 @@ modified October 12, 2017 (D.Cataert):
 modified October 16, 2017 (D.Cataert):
     in procedure tablo() the first row are labels, next rows are values
     procedure extractCol() modified to read only values
+modified October 31, 2017 (D.Cataert):
+    all procedures use "os.path" to handle path
+    bug in writeaddTab fixed
+modified November 03, 2017 (D.Cataert):
+    The values of dontChangeSyn connexions are now also copied in the .aproj
+    To do this getlistparam() has been modified:
+        synNbs = optSet.synList + optSet.dontChangeSynNbs
+        synNbs is now the list of all connexions that are actualised in .aproj
+    in optSet a distinction is now made between optSet.synList (connexions to
+    be modified by optimization processes and optSet.synsTot (that concerns all
+    connexions)
+modified November 09, 2017 (D. Cattaert):
+    getSimSetFromAsim() has been completed to include changes made in motorstim
+        asim_motorP = asimModel.getElementByType("MotorPosition")
+        asim_motorV = asimModel.getElementByType("MotorVelocity")
+        asim_motorStimuli = [asim_motorP, asim_motorV]
+        asimtab_motorst = affichMotor(asimModel, asim_motorStimuli,
+                                      affiche)
+        the function now returns "asimtab_motorst" as third argument
+        Accordingly changs were made in class AnimatLabSimFile that now
+        includes motor elements that can be accessed via:
+            .getElementByType("MotorPosition") and
+            .getElementByType("MotorVelocity")
+        These facilities are used in affichMotor() function
+    affichMotor() modified so that the last element in the return list.
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -233,7 +258,7 @@ def findFirstType(model, Type):
     return firstType
 
 
-def affichMotor(model, motorStimuli, show):
+def affichMotor(modl, motorStimuli, show):
     # find elements by type:   MotorPosition, MotorVelocity
     tabMotorVal = []
     i = 0
@@ -251,7 +276,7 @@ def affichMotor(model, motorStimuli, show):
             enabled_motor.append(motorEl[idx].find("Enabled").text)
             jID = motorEl[idx].find("JointID").text
             jointID.append(jID)
-            tmpjointName = model.getElementByID(jID).find("Name").text
+            tmpjointName = modl.getElementByID(jID).find("Name").text
             jointName.append(tmpjointName)
     # ... and print them
     if show == 1:
@@ -281,66 +306,68 @@ def affichMotor(model, motorStimuli, show):
                             start_motor[i],
                             end_motor[i],
                             speed[i],
-                            enabled_motor[i],
-                            jointID[i]
+                            jointID[i],
+                            enabled_motor[i]
                            ]
                            )
         i = i+1
-    print
+    # print
     return tabMotorVal
 
 
-def affichExtStim(ExternalStimuli, show):
+def affichExtStim(optSet, ExternalStimuli, show):
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
     # Neurons = model.getElementByType("Neurons")
     tabStimVal = []
-    i = 0
+    st = 0
     stimName, start_stim, end_stim = [], [], []
     currON_stim, currOFF_stim, enabled_stim = [], [], []
     targetNodeId = []
-    while i < len(ExternalStimuli):
-        stimName.append(ExternalStimuli[i].find("Name").text)
-        start_stim.append(float(ExternalStimuli[i].find("StartTime").text))
-        end_stim.append(float(ExternalStimuli[i].find("EndTime").text))
-        currON_stim.append(float(ExternalStimuli[i].find("CurrentOn").text))
-        currOFF_stim.append(float(ExternalStimuli[i].find("CurrentOff").text))
-        enabled_stim.append(ExternalStimuli[i].find("Enabled").text)
-        targetNodeId.append(ExternalStimuli[i].find("TargetNodeID").text)
-        i = i+1
+    while st < len(ExternalStimuli):
+        stimName.append(ExternalStimuli[st].find("Name").text)
+        start_stim.append(float(ExternalStimuli[st].find("StartTime").text))
+        end_stim.append(float(ExternalStimuli[st].find("EndTime").text))
+        currON_stim.append(float(ExternalStimuli[st].find("CurrentOn").text))
+        currOFF_stim.append(float(ExternalStimuli[st].find("CurrentOff").text))
+        enabled_stim.append(ExternalStimuli[st].find("Enabled").text)
+        targetNodeId.append(ExternalStimuli[st].find("TargetNodeID").text)
+        st = st+1
     # ... and print them
     if show == 1:
+        print
         print "list of external stimuli"
-    i = 0
-    while i < len(ExternalStimuli):
+    st = 0
+    while st < len(ExternalStimuli):
         if show == 1:
-            txt = '[%2d]  %s:\tStartTime:%.4e;\tEndTime:%.4e;'\
-                    + '\tCurrentOn %.4e;\tCurrentOff:%.4e;\tEnabled:%s'
-            print txt % (
-                        i,
-                        stimName[i],
-                        start_stim[i],
-                        end_stim[i],
-                        currON_stim[i],
-                        currOFF_stim[i],
-                        enabled_stim[i]
-                        )
+            if optSet.ExternalStimuli[st].find("Enabled").text == 'True':
+                txt = '[%2d]  %s:\tStartTime:%.4e;\tEndTime:%.4e;'\
+                        + '\tCurrentOn %.4e;\tCurrentOff:%.4e;\tEnabled:%s'
+                print txt % (
+                            st,
+                            stimName[st],
+                            start_stim[st],
+                            end_stim[st],
+                            currON_stim[st],
+                            currOFF_stim[st],
+                            enabled_stim[st]
+                            )
         tabStimVal.append([
-                           stimName[i],
-                           start_stim[i],
-                           end_stim[i],
-                           currON_stim[i],
-                           currOFF_stim[i],
-                           enabled_stim[i],
-                           targetNodeId[i]
+                           stimName[st],
+                           start_stim[st],
+                           end_stim[st],
+                           currON_stim[st],
+                           currOFF_stim[st],
+                           enabled_stim[st],
+                           targetNodeId[st]
                            ]
                           )
-        i = i+1
-    print
+        st = st+1
+    # print
     return tabStimVal
 
 
-def affichNeurons(Neurons, show):
+def affichNeurons(optSet, Neurons, show):
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
     # Neurons = model.getElementByType("Neurons")
@@ -352,27 +379,28 @@ def affichNeurons(Neurons, show):
         i = i+1
     # ... and print them
     if show == 1:
-        print "list of 'Voltage' neurons"
+        print
+        print "list of 'Voltage' neurons (disabled neurons are not shown)"
     if len(Neurons) == 0:
         print "No 'Voltage' Neuron"
     i = 0
     while i < len(Neurons):
         if show == 1:
-            txt = '[%2d]  %s:'
-            print txt % (
-                        i,
-                        neurName[i]
-                        )
+            if optSet.Neurons[i].find("Name").text != 'Disabled':
+                txt = '[%2d]  %s:'
+                print txt % (
+                            i,
+                            neurName[i]
+                            )
         tabNeurons.append([
                            neurName[i]
                            ]
                           )
         i = i+1
-    print
     return tabNeurons
 
 
-def affichNeuronsFR(NeuronsFR, show):
+def affichNeuronsFR(optSet, NeuronsFR, show):
     # To find elements by type:
     # Options are: Neurons, Adapters, ExternalStimuli
     # Neurons = model.getElementByType("Neurons")
@@ -384,24 +412,25 @@ def affichNeuronsFR(NeuronsFR, show):
         i = i+1
     # ... and print them
     if show == 1:
-        print "list of 'Firing Rate' neurons"
+        print
+        print "list of 'Firing Rate' neurons (disabled neurons are not shown)"
     if len(NeuronsFR) == 0:
         print "No  'Firing Rate' Neuron"
 
     i = 0
     while i < len(NeuronsFR):
         if show == 1:
-            txt = '[{:2d}]  {}:'
-            print txt.format(
-                        i,
-                        neurNameFR[i]
-                        )
+            if optSet.NeuronsFR[i].find("Name").text != 'Disabled':
+                txt = '[{:2d}]  {}:'
+                print txt.format(
+                            i,
+                            neurNameFR[i]
+                            )
         tabNeuronsFR.append([
                            neurNameFR[i]
                            ]
                           )
         i = i+1
-    print
     return tabNeuronsFR
 
 
@@ -414,25 +443,25 @@ def liste(Neurons):
     return listNeurons
 
 
-def affichConnexions(model, Connexions, show):
+def affichConnexions(model, optSet, Connexions, show):
     tabConnexions = []
-    i = 0
+    syn = 0
     sourceID, targetID, connexType, connexG = [], [], [], []
     connexSourceName, connexTargetName = [], []
     synapseID, synapseName, synapseType = [], [], []
     synapseEquil, synapseSynAmp, synapseThr = [], [], []
     # get connexions' source, target, and values...
-    while i < len(Connexions):
-        sourceID.append(Connexions[i].find("SourceID").text)
-        targetID.append(Connexions[i].find("TargetID").text)
-        neuronSource = model.getElementByID(sourceID[i])
-        neuronTarget = model.getElementByID(targetID[i])
+    while syn < len(Connexions):
+        sourceID.append(Connexions[syn].find("SourceID").text)
+        targetID.append(Connexions[syn].find("TargetID").text)
+        neuronSource = model.getElementByID(sourceID[syn])
+        neuronTarget = model.getElementByID(targetID[syn])
         connexSourceName.append(neuronSource.find("Name").text)
         connexTargetName.append(neuronTarget.find("Name").text)
-        connexType.append(Connexions[i].find("Type").text)
-        connexG.append(float(Connexions[i].find("G").text))
+        connexType.append(Connexions[syn].find("Type").text)
+        connexG.append(float(Connexions[syn].find("G").text))
 
-        synapseTempID = Connexions[i].find("SynapseTypeID").text
+        synapseTempID = Connexions[syn].find("SynapseTypeID").text
         synapseID.append(synapseTempID)
         synapseTempName = model.getElementByID(synapseTempID).find("Name").text
         synapseName.append(synapseTempName)
@@ -450,50 +479,51 @@ def affichConnexions(model, Connexions, show):
             TempThreshV = model.getElementByID(synapseTempID).\
                 find("ThreshPSPot").text
             synapseThr.append(float(TempThreshV))
-        i = i+1
+        syn = syn+1
     # ... and print them
     if show == 1:
+        print
         print "list of 'Voltage neurons' connexions"
     if len(Connexions) == 0:
         print "No  'Voltage neurons' Connexions"
-    i = 0
+    syn = 0
     nbConnexions = len(Connexions)
-    for i in range(nbConnexions):
+    for syn in range(nbConnexions):
         if show == 1:
-            space = ""
-            for k in range(4-((len(synapseName[i])+7)/8)):
-                space += "\t"
-            txt = '[%2d]  %s;' + space + 'SynAmp:%4.2f;\tThr:%4.2f;'
-            txt = txt + '\tGMax:%4.2f;\tEquil:%4.2f; \t%s;\t%s->%s'
-            print txt % (
-                        i,
-                        synapseName[i],
-                        synapseSynAmp[i],
-                        synapseThr[i],
-                        connexG[i],
-                        synapseEquil[i],
-                        synapseType[i],
-                        connexSourceName[i],
-                        connexTargetName[i]
-                        )
+            if syn not in optSet.disabledSynNbs:
+                space = ""
+                for k in range(4-((len(synapseName[syn])+7)/8)):
+                    space += "\t"
+                txt = '[%2d]  %s;' + space + 'SynAmp:%4.2f;\tThr:%4.2f;'
+                txt = txt + '\tGMax:%4.3f;\tEquil:%4.2f; \t%s;\t%s->%s'
+                print txt % (
+                            syn,
+                            synapseName[syn],
+                            synapseSynAmp[syn],
+                            synapseThr[syn],
+                            connexG[syn],
+                            synapseEquil[syn],
+                            synapseType[syn],
+                            connexSourceName[syn],
+                            connexTargetName[syn]
+                            )
         tabConnexions.append([
-                        synapseName[i],
-                        synapseSynAmp[i],
-                        synapseThr[i],
-                        connexG[i],
-                        synapseEquil[i],
-                        synapseType[i],
-                        connexSourceName[i],
-                        connexTargetName[i]
+                        synapseName[syn],
+                        synapseSynAmp[syn],
+                        synapseThr[syn],
+                        connexG[syn],
+                        synapseEquil[syn],
+                        synapseType[syn],
+                        connexSourceName[syn],
+                        connexTargetName[syn]
                         ]
                         )
-    print
     return tabConnexions
 
 
-def affichConnexionsFR(model, SynapsesFR, show):
+def affichConnexionsFR(model, optSet, SynapsesFR, show):
     tabConnexionsFR = []
-    i = 0
+    syn = 0
     # sourceID, targetID = [], []
     connexSourceName, connexTargetName = [], []
     synapseID, synapseName, synapseType = [], [], []
@@ -501,19 +531,19 @@ def affichConnexionsFR(model, SynapsesFR, show):
     # get connexions' source, target, and values...
     firstSynapseFR = findFirstType(model, "SynapsesFR")
 
-    for i in range(len(SynapsesFR)):
-        tempName = model.lookup["Name"][firstSynapseFR+i]
+    for syn in range(len(SynapsesFR)):
+        tempName = model.lookup["Name"][firstSynapseFR+syn]
         tempName.split('*')
         neuronSource = tempName.split('*')[0]
         neuronTarget = tempName.split('*')[1]
         connexSourceName.append(neuronSource)
         connexTargetName.append(neuronTarget)
 
-        synapseTempID = SynapsesFR[i].find("ID").text
+        synapseTempID = SynapsesFR[syn].find("ID").text
         synapseID.append(synapseTempID)
-        synapseTempName = connexSourceName[i] + "-" + connexTargetName[i]
+        synapseTempName = connexSourceName[syn] + "-" + connexTargetName[syn]
         synapseName.append(synapseTempName)
-        synapseTempType = SynapsesFR[i].find("Type").text
+        synapseTempType = SynapsesFR[syn].find("Type").text
         synapseType.append(synapseTempType)
 
         TempWeight = model.getElementByID(synapseTempID).find("Weight").text
@@ -521,122 +551,154 @@ def affichConnexionsFR(model, SynapsesFR, show):
 
     # ... and print them
     if show == 1:
+        print
         print "list of 'Firing Rate' neuron connexions"
     if len(SynapsesFR) == 0:
         print "No  'Firing Rate' neuron Connexions"
-    i = 0
-    for i in range(len(SynapsesFR)):
+    syn = 0
+    for syn in range(len(SynapsesFR)):
         if show == 1:
-            space = ""
-            for sp in range(3-(len(synapseName[i])+1)/8):
-                space += '\t'
-            txt = '[{:2d}]\t{};' + space + '\tWeight:{:.2e};\t{};\t{}  ->\t{}'
-            print txt.format(
-                        i,
-                        synapseName[i],
-                        synapseWeight[i],
-                        synapseType[i],
-                        connexSourceName[i],
-                        connexTargetName[i]
-                        )
+            if syn not in optSet.disabledSynFRNbs:
+                sp = ""
+                for n in range(3-(len(synapseName[syn])+1)/8):
+                    sp += '\t'
+                txt = '[{:2d}]\t{};' + sp + '\tWeight:{:.2e};\t{};\t{}  ->\t{}'
+                print txt.format(
+                            syn,
+                            synapseName[syn],
+                            synapseWeight[syn],
+                            synapseType[syn],
+                            connexSourceName[syn],
+                            connexTargetName[syn]
+                            )
         tabConnexionsFR.append([
-                        synapseName[i],
-                        synapseWeight[i],
-                        synapseType[i],
-                        connexSourceName[i],
-                        connexTargetName[i]
+                        synapseName[syn],
+                        synapseWeight[syn],
+                        synapseType[syn],
+                        connexSourceName[syn],
+                        connexTargetName[syn]
                         ]
                         )
-    print
     return tabConnexionsFR
 
 
-def getlistparam(optSet, seriesStimParam, seriesSynParam, seriesSynFRParam,
+def getlistparam(optSet, seriesStimParam,
+                 seriesSynParam, seriesSynNSParam, seriesSynFRParam,
                  asimtab_stims,
                  asimtab_connexions,
                  asimtab_connexionsFR):
-    v = []
+    val = []
     stimName = []
     synName = []
     synFRName = []
-    listSt = optSet.stimsTot
 
+    listSt = optSet.stimList + optSet.dontChangeStimNbs
     for param in range(len(seriesStimParam)):
         paramName = seriesStimParam[param]
         if paramName == "StartTime":
             for stim in range(len(listSt)):
-                v.append(asimtab_stims[listSt[stim]][1])
+                val.append(asimtab_stims[listSt[stim]][1])
                 stimName.append(asimtab_stims[listSt[stim]][0] + "." +
                                 paramName)
         if paramName == "EndTime":
             for stim in range(len(listSt)):
-                v.append(asimtab_stims[listSt[stim]][2])
+                val.append(asimtab_stims[listSt[stim]][2])
                 stimName.append(asimtab_stims[listSt[stim]][0] + "." +
                                 paramName)
         if paramName == "CurrentOn":
             for stim in range(len(listSt)):
-                x0stimtmp = asimtab_stims[listSt[stim]][3]
-                # x0stimNorm = x0stimtmp
-                # v.append(x0stimNorm)
-                v.append(x0stimtmp)
+                valstim = asimtab_stims[listSt[stim]][3]
+                val.append(valstim)
                 stimName.append(asimtab_stims[listSt[stim]][0] + "." +
                                 paramName)
+
+    synNbs = optSet.synList + optSet.dontChangeSynNbs
     for synparam in range(len(seriesSynParam)):
         synparamName = seriesSynParam[synparam]
         if synparamName == 'G':
+            # this is a connexion -> name is in "model.lookup["Name"]"
             firstConnexion = findFirstType(optSet.model, "Connexions")
-            for syn in range(len(optSet.synList)):
-                rang = optSet.synList[syn] + firstConnexion
-                temp = optSet.model.lookup["Name"][rang] + "." + synparamName
-                synName.append(temp)
-                x0syntmp = asimtab_connexions[optSet.synList[syn]][3]
-                v.append(x0syntmp)
+            for idx, syn in enumerate(synNbs):
+                if asimtab_connexions[syn][5] == 'SpikingChemical':
+                    # confirms that it is a spiking chemichal synapse
+                    rang = syn + firstConnexion
+                    name = optSet.model.lookup["Name"][rang] +\
+                        "." + synparamName
+                    synName.append(name)
+                    synval = asimtab_connexions[syn][3]
+                    val.append(synval)
+
+    for synparam in range(len(seriesSynNSParam)):
+        synparamName = seriesSynNSParam[synparam]
+        if synparamName == 'SynAmp':
+            for syn in synNbs:
+                if asimtab_connexions[syn][5] == 'NonSpikingChemical':
+                    synName.append(asimtab_connexions[syn][0] + "." +
+                                   synparamName)
+                    synval = asimtab_connexions[syn][1]
+                    val.append(synval)
+        if synparamName == 'ThreshV':
+            for syn in synNbs:
+                if asimtab_connexions[syn][5] == 'NonSpikingChemical':
+                    synName.append(asimtab_connexions[syn][0] + "." +
+                                   synparamName)
+                    synval = asimtab_connexions[syn][2]
+                    val.append(synval)
+
     for synparam in range(len(seriesSynFRParam)):
         synparamName = seriesSynFRParam[synparam]
         if synparamName == "Weight":
-            firstConnexion = findFirstType(optSet.model, "SynapsesFR")
-            for synFR in range(len(optSet.synListFR)):
-                rang = optSet.synListFR[synFR] + firstConnexion
+            firstConnexionFR = findFirstType(optSet.model, "SynapsesFR")
+            for idx, synFR in enumerate(optSet.synListFR):
+                rang = synFR + firstConnexionFR
                 temp = optSet.model.lookup["Name"][rang] + "." + synparamName
                 synFRName.append(temp)
-                x0syntmp = asimtab_connexionsFR[optSet.synListFR[synFR]][1]
-                v.append(x0syntmp)
+                val.append(asimtab_connexionsFR[synFR][1])
 
-    result = [listSt, v, stimName, synName, synFRName]
+    result = [listSt, val, stimName, synName, synFRName]
     return result
 
 
 def getSimSetFromAsim(optSet,
-                      seriesStimParam, seriesSynParam, seriesSynFRParam,
+                      seriesStimParam, seriesSynParam,
+                      seriesSynNSParam, seriesSynFRParam,
                       asimFileName, affiche=0):
     asimModel = AnimatLabModel.AnimatLabSimFile(asimFileName)
-    asimreadAnimatLabSimDir = asimModel.getElementByType("ExternalStimuli")
-    asimtab_stims = affichExtStim(asimreadAnimatLabSimDir,
+
+    asim_motorP = asimModel.getElementByType("MotorPosition")
+    asim_motorV = asimModel.getElementByType("MotorVelocity")
+    asim_motorStimuli = [asim_motorP, asim_motorV]
+    asimtab_motorst = affichMotor(asimModel, asim_motorStimuli,
+                                  affiche)
+    asimExternalStimuli = asimModel.getElementByType("ExternalStimuli")
+    asimtab_stims = affichExtStim(optSet, asimExternalStimuli,
                                   affiche)
     asimConnexions = asimModel.getElementByType("Connexions")
-    asimtab_connexions = affichConnexions(asimModel, asimConnexions,
+    asimtab_connexions = affichConnexions(asimModel, optSet, asimConnexions,
                                           affiche)
     asimSynapsesFR = asimModel.getElementByType("SynapsesFR")
-    asimtab_connexionsFR = affichConnexionsFR(asimModel, asimSynapsesFR,
+    asimtab_connexionsFR = affichConnexionsFR(asimModel, optSet,
+                                              asimSynapsesFR,
                                               affiche)
     # initlistparam()
     res = getlistparam(optSet,
-                       seriesStimParam, seriesSynParam, seriesSynFRParam,
+                       seriesStimParam,
+                       seriesSynParam, seriesSynNSParam, seriesSynFRParam,
                        asimtab_stims,
                        asimtab_connexions,
                        asimtab_connexionsFR)
-    [listSt, v, stimParName, synParName, synFRParName] = res
+    [listSt, val, stimParName, synParName, synFRParName] = res
     simSet = SimulationSet.SimulationSet()
     for st in range(len(stimParName)):
-        simSet.set_by_range({stimParName[st]: [v[st]]})
+        simSet.set_by_range({stimParName[st]: [val[st]]})
     nst = len(stimParName)
     for syn in range(len(synParName)):
-        simSet.set_by_range({synParName[syn]: [v[nst+syn]]})
+        simSet.set_by_range({synParName[syn]: [val[nst+syn]]})
     nsyn = len(synParName)
     for syFR in range(len(synFRParName)):
-        simSet.set_by_range({synFRParName[syFR]: [v[nst+nsyn+syFR]]})
+        simSet.set_by_range({synFRParName[syFR]: [val[nst+nsyn+syFR]]})
     print simSet.samplePts
-    return [simSet, asimtab_stims]
+    return [simSet, asimtab_stims, asimtab_motorst]
 
 
 def existe(fname):
@@ -662,8 +724,9 @@ def getValuesFromText(txt):
 
 def readTabloTxt(sourceDir, filename):
     tabfinal = []
-    if existe(sourceDir + filename):
-        f = open(sourceDir + filename, 'r')
+    pathname = os.path.join(sourceDir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         i = 0
         while 1:
             # print i
@@ -689,8 +752,9 @@ def readTabloTxt(sourceDir, filename):
 
 def readTablo(sourceDir, filename):
     tabfinal = []
-    if existe(sourceDir + filename):
-        f = open(sourceDir + filename, 'r')
+    pathname = os.path.join(sourceDir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         i = 0
         while 1:
             # print i
@@ -716,8 +780,9 @@ def readTablo(sourceDir, filename):
 
 def tablo(folders, filename):
     tabfinal = []
-    if existe(folders.animatlab_result_dir + filename):
-        f = open(folders.animatlab_result_dir + filename, 'r')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         i = 0
         while 1:
             tab1 = []
@@ -744,6 +809,8 @@ def tablo(folders, filename):
                 """
                 i = i+1
         f.close()
+    else:
+        print pathname, "does not exist!!!"
     return tabfinal
 
 
@@ -1011,8 +1078,9 @@ def chargeParamValues(folders, filename, allPhases,
                       seriesParam, Param):
     strTab = []
     tmp = []
-    if existe(folders.animatlab_result_dir + filename):
-        f = open(folders.animatlab_result_dir + filename, 'r')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         while 1:
             txt = f.readline()
             # print txt
@@ -1036,8 +1104,9 @@ def chargeParamValues(folders, filename, allPhases,
 def chargeBestParams(folders, filename, defaultval, allPhases, seriesParam):
     strTab = []
     tmp = []
-    if existe(folders.animatlab_result_dir + filename):
-        f = open(folders.animatlab_result_dir + filename, 'r')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         while 1:
             txt = f.readline()
             # print txt
@@ -1061,8 +1130,9 @@ def chargeBestSynValues(folders, model, filename, Connex,
     # filename = "synbestvalues.txt"
     strTab = []
     tmp = []
-    if existe(folders.animatlab_result_dir + filename):
-        f = open(folders.animatlab_result_dir + filename, 'r')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         while 1:
             txt = f.readline()
             print txt
@@ -1178,14 +1248,14 @@ def savechartfile(name, directory, chart, comment):
     txtnumber = "00"
     if not os.path.exists(directory):
         os.makedirs(directory)
-    destfilename = directory + name + "00.txt"
-    while existe(destfilename):
+    destfilename = os.path.join(directory, name + "00.txt")
+    while os.path.exists(destfilename):
         number = number + 1
         if number < 10:
             txtnumber = "0" + str(number)
         else:
             txtnumber = str(number)
-        destfilename = directory + name + txtnumber + ".txt"
+        destfilename = os.path.join(directory, name + txtnumber + ".txt")
     chartname = ""
     # copy(folders.animatlab_result_dir + txtchartname)
     if chart != []:
@@ -1209,14 +1279,14 @@ def savefileincrem(name, directory, tab, comment):
     txtnumber = "00"
     if not os.path.exists(directory):
         os.makedirs(directory)
-    destfilename = directory + name + "00.txt"
-    while existe(destfilename):
+    destfilename = os.path.join(directory, name + "00.txt")
+    while os.path.exists(destfilename):
         number = number + 1
         if number < 10:
             txtnumber = "0" + str(number)
         else:
             txtnumber = str(number)
-        destfilename = directory + name + txtnumber + ".txt"
+        destfilename = os.path.join(directory, name + txtnumber + ".txt")
     filename = ""
     # copy(folders.animatlab_result_dir + txtchartname)
     if tab != []:
@@ -1240,14 +1310,14 @@ def createSubDirIncrem(destDir, destSubDir):
     txtnumber = "00"
     if not os.path.exists(destDir):
         os.makedirs(destDir)
-    destdirname = destDir + destSubDir + "-00"
+    destdirname = os.path.join(destDir, destSubDir + "-00")
     while os.path.exists(destdirname):
         number = number + 1
         if number < 10:
             txtnumber = "0" + str(number)
         else:
             txtnumber = str(number)
-        destdirname = destDir + destSubDir + "-" + txtnumber
+        destdirname = os.path.join(destDir, destSubDir + "-" + txtnumber)
     os.makedirs(destdirname)
     print destdirname
     return destdirname + "/"
@@ -1255,26 +1325,26 @@ def createSubDirIncrem(destDir, destSubDir):
 
 def writeaddTab(folders, tab, filename, mode, comment, flag):
     s = ""
-    filename = folders.animatlab_result_dir + filename
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
     if mode == 'w':
-        f = open(filename, 'w')
+        f = open(pathname, 'w')
     else:
-        f = open(filename, 'a')
+        f = open(pathname, 'a')
     for i in range(len(tab)-1):
         s = s + str(tab[i]) + '\t'
     s = s + str(tab[i+1]) + '\n'
     if flag == 1:
-        print comment, s
+        print comment
     f.write(s)
     f.close()
 
 
 def read_addTab(folders, tab, filename, comment, flag):
-    filename = folders.animatlab_result_dir + filename
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
     strTab = []
     tmp = []
-    if existe(folders.animatlab_result_dir + filename):
-        f = open(folders.animatlab_result_dir + filename, 'r')
+    if os.path.exists(pathname):
+        f = open(pathname, 'r')
         while 1:
             txt = f.readline()
             # print txt
@@ -1289,8 +1359,8 @@ def read_addTab(folders, tab, filename, comment, flag):
 
 def writeTabVals(folders, tab, filename, comment, flag):
     s = ""
-    filename = folders.animatlab_result_dir + filename
-    f = open(filename, 'w')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    f = open(pathname, 'w')
     for i in range(len(tab)-1):
         try:
             s = s + "{:2.8f}".format(tab[i]) + '\t'
@@ -1306,10 +1376,10 @@ def writeTabVals(folders, tab, filename, comment, flag):
     f.close()
 
 
-def writeBestValuesTab(folders, ficname, tab_var, params, trial,
+def writeBestValuesTab(folders, filename, tab_var, params, trial,
                        chartfilename, bestfit):
-    filename = folders.animatlab_result_dir + ficname
-    f = open(filename, 'a')
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    f = open(pathname, 'a')
 
     now = datetime.datetime.now()
     s = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -1334,16 +1404,16 @@ def writeBestValuesTab(folders, ficname, tab_var, params, trial,
     f.close()
 
 
-def writeBestResSuite(folders, ficname, bestresults, titre):
+def writeBestResSuite(folders, filename, bestresults, titre):
     nblines = 0
     write = False
-    filename = folders.animatlab_result_dir + ficname
-    if (not existe(filename)):
+    pathname = os.path.join(folders.animatlab_result_dir, filename)
+    if not os.path.exists(pathname):
         write = True
-    if existe(filename) and titre == 0:
+    if os.path.exists(pathname) and titre == 0:
         write = True
-    if existe(filename) and titre == 1:
-        f = open(filename, 'r')
+    if os.path.exists(pathname) and titre == 1:
+        f = open(pathname, 'r')
         while True:
             txt = f.readline()
             # print txt
@@ -1356,7 +1426,7 @@ def writeBestResSuite(folders, ficname, bestresults, titre):
             write = True
     if write:
         s = ""
-        f = open(filename, 'a')
+        f = open(pathname, 'a')
         for i in range(len(bestresults)-1):
             s = s + str(bestresults[i]) + '\t'
         s = s + str(bestresults[len(bestresults)-1]) + '\n'
@@ -1440,7 +1510,6 @@ def setPlaybackControlMode(model, mode):
         modestr = "perso"
     print "PlaybackControlMode has been changed from", oldmodestr,
     print "to", modestr
-    print
 
 
 def setGravity(model, gravity):
@@ -1927,7 +1996,7 @@ def runImproveStims(folders, model, optSet, projMan, epoch):
     shStim = []
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet object
     # mvtTemplate = allPhasesStim[4]
-    tab_stims = affichExtStim(optSet.ExternalStimuli, 1)
+    tab_stims = affichExtStim(optSet, optSet.ExternalStimuli, 1)
     for phase in range(len(optSet.allPhasesStim)):
         Stim.append(optSet.allPhasesStim[phase][0])
         shStim.append(optSet.allPhasesStim[phase][1])
@@ -2048,7 +2117,8 @@ def runImproveStims(folders, model, optSet, projMan, epoch):
                     # ################################
                     model.saveXML(overwrite=True)   # in the FinalModel dir
                     # ################################
-                    tab_stims = affichExtStim(optSet.ExternalStimuli, 0)
+                    tab_stims = affichExtStim(optSet,
+                                              optSet.ExternalStimuli, 0)
         writeBestResSuite(folders, "stimbestvaluesSuite.txt", bestvals, 0)
         writeBestResSuite(folders, "stimbestfitsSuite.txt", bestStimfits, 0)
         writeBestResSuite(folders, "stimbestfitsCoactSuite.txt",
@@ -2065,7 +2135,8 @@ def runImproveSynapses(folders, model, optSet, projMan, epoch):
     Syn = []
     shSyn = []
     simSet = SimulationSet.SimulationSet()  # Instantiate simulationSet obj
-    tab_connexions = affichConnexions(model, optSet.Connexions, 1)  # idem
+    tab_connexions = affichConnexions(model, optSet,
+                                      optSet.Connexions, 1)  # idem
     for phase in range(len(optSet.allPhasesSyn)):
         Syn.append(optSet.allPhasesSyn[phase][0])
         shSyn.append(optSet.allPhasesSyn[phase][1])
@@ -2142,35 +2213,31 @@ def runImproveSynapses(folders, model, optSet, projMan, epoch):
              lineStart, lineEnd, template] = optSet.allPhasesSyn[phase]
             for syn in range(len(syns)):
                 synRank = syns[shuffledsyns[syn]]
-                for synparam in range(len(optSet.seriesSynParam)):
-                    # print rang
-                    paramSynName = optSet.seriesSynParam[synparam]
-                    multSyn = deltaSynCo[shuffled_rang[rang]]
-                    synapseTempID = optSet.Connexions[synRank].\
-                        find("SynapseTypeID").text
-
-                    # choose the name of parameter adapted to synapse type
-                    # ------------------------------------------------------
-                    synapseTempType = model.getElementByID(synapseTempID).\
-                        find("Type").text
+                synapseTempID = optSet.Connexions[synRank].\
+                    find("SynapseTypeID").text
+                synapseTempType = model.getElementByID(synapseTempID).\
+                    find("Type").text
+                # choose the parameters adapted to synapse type
+                if synapseTempType == "NonSpikingChemical":
+                    seriesSynPar = optSet.seriesSynNSParam
+                elif synapseTempType == "SpikingChemical":
+                    seriesSynPar = optSet.seriesSynParam
+                for synparam in range(len(seriesSynPar)):
                     if synapseTempType == "NonSpikingChemical":
-                        if paramSynName == "ThreshV":
-                            paramSynName = "ThreshV"
-                    elif synapseTempType == "SpikingChemical":
-                        if paramSynName == "ThreshV":
-                            paramSynName = "ThreshPSPot"
-                    # ------------------------------------------------------
-
-                    if paramSynName == "G":
-                        val = optSet.Connexions[synRank].find("G").text
-                    else:
+                        paramSynName = optSet.seriesSynNSParam[synparam]
                         val = model.getElementByID(synapseTempID).\
-                            find(paramSynName).text
+                            find(seriesSynPar[synparam]).text
+                    elif synapseTempType == "SpikingChemical":
+                        paramSynName = optSet.seriesSynParam[synparam]
+                        val = optSet.Connexions[synRank].\
+                            find(seriesSynPar[synparam]).text
+
                     initialSynvalue = float(val)
                     if (paramSynName == 'SynAmp') or (paramSynName == 'G'):
                         if initialSynvalue == 0:
                             initialSynvalue = 0.0001  # to avoid being trapped
                     i = 0
+                    multSyn = deltaSynCo[shuffled_rang[rang]]
                     if optSet.nbsteps > 0:
                         result = improveSynparam(folders, model, optSet,
                                                  projMan, simSet,
@@ -2232,7 +2299,7 @@ def runImproveSynapses(folders, model, optSet, projMan, epoch):
                     # ################################
                     model.saveXML(overwrite=True)   # in the FinalModel dir
                     # ################################
-                    tab_connexions = affichConnexions(model,
+                    tab_connexions = affichConnexions(model, optSet,
                                                       optSet.Connexions, 0)
         writeBestResSuite(folders, "synbestvaluesSuite.txt", bestSynvals, 0)
         writeBestResSuite(folders, "synbestfitsSuite.txt", bestSynfits, 0)
@@ -2515,6 +2582,8 @@ def runSimMvt(folders, model, optSet, projMan,
         ext = os.path.splitext(aprojFileName)[1]
         ficname = name + "CMAeMin" + ext
         aprojCMAeDir = folders.animatlab_rootFolder + "CMAeMinAprojFiles/"
+        model.actualizeAprojStimState(optSet.tab_stims, affiche=0)
+        model.actualizeAprojMotorState(optSet.tab_motors, affiche=0)
         model.saveXMLaproj(aprojCMAeDir + ficname)
         print "-----------------------------------"
         comment = simFileName + '-{0:d}.asim'.format(numero)
@@ -2583,12 +2652,16 @@ def runCMAe(folders, model, optSet, projMan, nbevals):
     deb = len(optSet.stimParName)
     affichParamLimits(optSet.synParName, optSet.reallower,
                       optSet.realupper, optSet.realx0, deb)
+    affichParamLimits(optSet.synFRParName, optSet.reallower,
+                      optSet.realupper, optSet.realx0, deb)
     print
     deb = 0
     affichParamLimits(optSet.stimParName, optSet.lower,
                       optSet.upper, optSet.x0, deb)
     deb = len(optSet.stimParName)
     affichParamLimits(optSet.synParName, optSet.lower,
+                      optSet.upper, optSet.x0, deb)
+    affichParamLimits(optSet.synFRParName, optSet.lower,
                       optSet.upper, optSet.x0, deb)
     ##################################################
     [res, simSet] = improve(nbevals, adj_cmaes_sigma)

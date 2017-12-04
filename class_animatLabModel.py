@@ -22,6 +22,10 @@ modified September 19, 2017 (D. Cattaert, C. Halgand):
             newname = rootName + '-%i.asim' % ix
             fileName = os.path.join(saveDir, newname)
     procedure saveXMLaproj changed in the same way
+modified November 09, 2017 (D. Cattaert):
+    class AnimatLabSimFile has been completed to include motor elements
+    for getElementByType("MotorPosition") and getElementByType("MotorVelocity")
+    These facilities are used in "optimization.py" in affichMotor() function
 """
 
 # Import dependencies
@@ -926,6 +930,14 @@ class AnimatLabModel(object):
                     # ATTENTION!!! Animatlab simfile indique G = Value
                     el = node.find('SynapticConductance')
                     self.asimtoaproj(el, ptVar, pts, "Value", affiche)
+                elif param == 'SynAmp':
+                    # ATTENTION!!! Animatlab simfile indique SynAmp = Value
+                    el = node.find('MaxSynapticConductance')
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
+                elif param == 'ThreshV':
+                    # ATTENTION!!! Animatlab simfile indique ThreshV = Value
+                    el = node.find('PreSynapticThreshold')
+                    self.asimtoaproj(el, ptVar, pts, "Value", affiche)
                 elif param == "Weight":
                     # ATTENTION!!! Animatlab simfile indique Weight = Actual
                     el = node.find('Weight')
@@ -941,7 +953,7 @@ class AnimatLabModel(object):
                     el = node.find('EndTime')
                     self.asimtoaproj(el, ptVar, pts, "Actual", affiche)
 
-    def actualizeAprojStimState(self, asimtab_stims):
+    def actualizeAprojStimState(self, asimtab_stims, affiche=0):
             for extStim in range(len(asimtab_stims)):
                 # Find the AnimatLab element by name
                 name = asimtab_stims[extStim][0]
@@ -950,15 +962,34 @@ class AnimatLabModel(object):
                 node = self.getElementByNameAproj(name)
                 el = node.find('Enabled').text
                 node.find('Enabled').text = str(state)
+                if affiche:
+                    txt1 = str(name)
+                    for k in range(3-(len(txt1)/8)):
+                        txt1 += "\t"
+                    txt2 = str(el) + " ---> "
+                    for k in range(2-(len(txt2)/8)):
+                        txt2 += "\t"
+                    print txt1 + txt2 + str(state)
+                    # print name, "\t", el, "--->", "\t", state
 
-                txt1 = str(name)
-                for k in range(3-(len(txt1)/8)):
-                    txt1 += "\t"
-                txt2 = str(el) + " ---> "
-                for k in range(2-(len(txt2)/8)):
-                    txt2 += "\t"
-                print txt1 + txt2 + str(state)
-                # print name, "\t", el, "--->", "\t", state
+    def actualizeAprojMotorState(self, asimtab_motorst, affiche=0):
+            for motorSt in range(len(asimtab_motorst)):
+                # Find the AnimatLab element by name
+                name = asimtab_motorst[motorSt][0]
+                state = asimtab_motorst[motorSt][5]
+                # print name, state
+                node = self.getElementByNameAproj(name)
+                el = node.find('Enabled').text
+                node.find('Enabled').text = str(state)
+                if affiche:
+                    txt1 = str(name)
+                    for k in range(3-(len(txt1)/8)):
+                        txt1 += "\t"
+                    txt2 = str(el) + " ---> "
+                    for k in range(2-(len(txt2)/8)):
+                        txt2 += "\t"
+                    print txt1 + txt2 + str(state)
+                    # print name, "\t", el, "--->", "\t", state
 
     def saveXMLaproj(self, fileName='', overwrite=False):
         """
@@ -1001,6 +1032,7 @@ class AnimatLabModel(object):
 
         print 'Saving file: {}'.format(fileNameOK)
         self.aprojtree.write(fileNameOK)
+        return fileNameOK
 
 
 class AnimatLabSimFile(object):
@@ -1078,8 +1110,84 @@ class AnimatLabSimFile(object):
             lookupName.append(sname + "*" + tname)
             lookupElement.append(el)
 
-        # for el in root.find("ExternalStimuli").getchildren():
-        #    lookupAppend(el, "ExternalStimuli")
+        ######################################################################
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        def analyzeChilbodies(rb, level):
+            txt = ""
+            rbfound = 0
+            chrblist = []
+            for n in range(level):
+                txt += "\t"
+            # print txt, level, rb, rb.find("Name").text
+            el = rb.find("Joint")
+            if el is not None:
+                print txt + el.find("Name").text
+                lookupAppend(el, "Joint")
+            elt = rb.find("ChildBodies")
+            if elt is not None:
+                rbfound = 1
+                chrblist = list(elt)
+            # if rbfound == 0:
+            #     print txt + "No childbodies"
+            # if rbfound == 1:
+            #     print txt + "childbodies found",
+            #     print txt, level, chrblist
+            return [rbfound, chrblist]
+
+        print "\nREADING .asim elements..."
+
+        """
+        modified August 30, 2017 (D. Cattaert) to handle Joints parameters
+        """
+        level = 0
+        rbfound = 0
+        subfound = 0
+        childRbNb = 0
+        nbsub = 1  # the firt list of rigid bodies
+        subchrblist = []
+        path = "Environment/Organisms"
+        organisms = list(root.find(path))
+        for organism in organisms:
+            for rigidbodyelmt in list(organism.find("RigidBody")):
+                # print rigidbodyelmt
+                if list(rigidbodyelmt) != []:
+                    # print list(rigidbodyelmt)
+                    subfound = 1
+                    rbeltlist = list(rigidbodyelmt)
+                    subchrblist.append(rbeltlist)
+                    childRbNb = 0
+                    # number of child RigidBodies
+
+                    while subfound:
+                        for ch in range(nbsub):
+                            childRbNb = 0
+                            subfound = 0  # flag to indicate a child rb exists
+                            # first looks for all childbodies from same parent
+                            for rb in subchrblist[level+ch]:
+                                [rbfound, chrblist] = analyzeChilbodies(rb,
+                                                                        level)
+                                if rbfound:
+                                    childRbNb += 1
+                                    subfound = 1
+                                    # each time childbodies are found, the list
+                                    # is added to the subchrblist
+                                    subchrblist.append(chrblist)
+                                nbsub = childRbNb
+                                # ... continues the analysis of the parent
+                            if subfound:    # once the parent has been scaned,
+                                level += 1  # and childbodies found, each child
+                                # becomes parent: the process starts again
+        ######################################################################
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorPosition":
+                lookupAppend(el, "MotorPosition")
+
+        for el in list(root.find("ExternalStimuli")):
+            if el.find("Type").text == "MotorVelocity":
+                lookupAppend(el, "MotorVelocity")
 
         for el in list(root.find("ExternalStimuli")):
             if el.find("Type").text == "Current":
