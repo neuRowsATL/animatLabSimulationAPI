@@ -134,6 +134,12 @@ modified November 09, 2017 (D. Cattaert):
             .getElementByType("MotorVelocity")
         These facilities are used in affichMotor() function
     affichMotor() modified so that the last element in the return list.
+modified January 15, 20187 (D. Cattaert):
+   in CMAe procedures, connexions between firing rate (FR) neurons is now
+   considered.
+   normToRealVal(x, optSet, simSet, stimParName, synParName, synFRParName)
+   is a new functions that produces the simSet dictionary with normalized
+   values needed to tun CMAe procedures
 """
 
 import class_animatLabModel as AnimatLabModel
@@ -2528,11 +2534,46 @@ def affichParamLimits(sParName, vallower, valupper, valx0, deb):
         # + txt2 + str(mid))
 
 
+def normToRealVal(x, optSet, simSet, stimParName, synParName, synFRParName):
+    simSet.samplePts = []
+    vals = []
+    for st in range(len(stimParName)):
+        # calculation of real values... for external stimuli
+        val = x[st]*(optSet.realupper[st] - optSet.reallower[st]) +\
+               optSet.reallower[st]
+        vals.append(val)
+        # print stimParName[st], val
+        simSet.set_by_range({stimParName[st]: [val]})
+        # print simSet.samplePts
+        # calculation of real values... for synapses
+    rg1stsy = len(stimParName)
+    for sy in range(len(synParName)):
+        val = (x[rg1stsy+sy]*(optSet.realupper[rg1stsy+sy] -
+                              optSet.reallower[rg1stsy+sy]) +
+               optSet.reallower[rg1stsy+sy])
+        vals.append(val)
+        # print synParName[sy], val
+        simSet.set_by_range({synParName[sy]: [val]})
+        # print simSet.samplePts
+    rg1stsyFR = len(stimParName) + len(synParName)
+    for syFR in range(len(synFRParName)):
+        val = (x[rg1stsyFR+syFR]*(optSet.realupper[rg1stsyFR+syFR] -
+                                  optSet.reallower[rg1stsyFR+syFR]) +
+               optSet.reallower[rg1stsyFR+syFR])
+        vals.append(val)
+        # print synFRParName[syFR], val
+        simSet.set_by_range({synFRParName[syFR]: [val]})
+        # print simSet.samplePts
+    return [simSet, vals]
+
+
 def runSimMvt(folders, model, optSet, projMan,
               x, chartRootName, fitValFileName, affiche):
     simSet = SimulationSet.SimulationSet()
     stimParName = optSet.stimParName
     synParName = optSet.synParName
+    synFRParName = optSet.synFRParName
+    """
     for st in range(len(stimParName)):
         val = x[st]*(optSet.realupper[st] - optSet.reallower[st]) +\
                      optSet.reallower[st]
@@ -2542,6 +2583,9 @@ def runSimMvt(folders, model, optSet, projMan,
                            optSet.reallower[st+1+sy]) +
                optSet.reallower[st+1+sy])
         simSet.set_by_range({synParName[sy]: [val]})
+    """
+    [simSet, vals] = normToRealVal(x, optSet, simSet,
+                                   stimParName, synParName, synFRParName)
     if affiche == 1:
         print simSet.samplePts
     projMan.make_asims(simSet)
@@ -2592,7 +2636,7 @@ def runSimMvt(folders, model, optSet, projMan,
     else:
         result = [trial, mse+coactpenality, mse, coactpenality, coact]
     writeBestResSuite(folders, fitValFileName, result, 0)
-    return result
+    return [result, vals]
 
 
 def runCMAe(folders, model, optSet, projMan, nbevals):
@@ -2602,14 +2646,18 @@ def runCMAe(folders, model, optSet, projMan, nbevals):
 
     def f(x):
         global simNb
-        result = runSimMvt(folders, model, optSet, projMan,
-                           x, 'CMAeChart', "CMAefitCourse.txt", 0)
-        valeurs = [simNb]
+        [result, vals] = runSimMvt(folders, model, optSet, projMan,
+                                   x, 'CMAeChart', "CMAefitCourse.txt", 0)
+        normVals = [simNb]
+        realVals = [simNb]
         for i in range(len(x)):
-            valeurs.append(x[i])
-        writeBestResSuite(folders, "CMAeXValues.txt", valeurs, 0)
+            normVals.append(x[i])
+            realVals.append(vals[i])
+        writeBestResSuite(folders, "CMAeXValues.txt", normVals, 0)
+        writeBestResSuite(folders, "CMAeRealValues.txt", realVals, 0)
+
         simNb += 1
-        if fmod(simNb, 11) == 0.0:
+        if fmod(simNb, 10) == 0.0:
             print
         err = result[1]
         return err
@@ -2617,6 +2665,7 @@ def runCMAe(folders, model, optSet, projMan, nbevals):
     def improve(nbevals, adj_cmaes_sigma):
         stimParName = optSet.stimParName
         synParName = optSet.synParName
+        synFRParName = optSet.synFRParName
         # ===================================================================
         res = fmin(f, optSet.x0, adj_cmaes_sigma,
                    options={'bounds': [optSet.lower, optSet.upper],
@@ -2629,17 +2678,28 @@ def runCMAe(folders, model, optSet, projMan, nbevals):
         # once all nbevals tests are done...
         # ... save the best asim file in simFiles directory
         simSet = SimulationSet.SimulationSet()
+        """
         for st in range(len(stimParName)):
             # calculation of real values... for external stimuli
             val = x[st]*(optSet.realupper[st] - optSet.reallower[st]) +\
                    optSet.reallower[st]
             simSet.set_by_range({stimParName[st]: [val]})
             # calculation of real values... for synapses
+        rg1stsy = len(stimParName)
         for sy in range(len(synParName)):
-            val = (x[st+1+sy]*(optSet.realupper[st+1+sy] -
-                               optSet.reallower[st+1+sy]) +
-                   optSet.reallower[st+1+sy])
+            val = (x[rg1stsy+sy]*(optSet.realupper[rg1stsy+sy] -
+                                  optSet.reallower[rg1stsy+sy]) +
+                   optSet.reallower[rg1stsy+sy])
             simSet.set_by_range({synParName[sy]: [val]})
+        rg1stsyFR = len(stimParName) + len(synParName)
+        for syFR in range(len(synFRParName)):
+            val = (x[rg1stsyFR+syFR]*(optSet.realupper[rg1stsyFR+syFR] -
+                                      optSet.reallower[rg1stsyFR+syFR]) +
+                   optSet.reallower[rg1stsyFR+syFR])
+            simSet.set_by_range({synParName[syFR]: [val]})
+        """
+        [simSet, vals] = normToRealVal(x, optSet, simSet,
+                                       stimParName, synParName, synFRParName)
         print simSet.samplePts
         return [res, simSet]
 
@@ -2663,6 +2723,22 @@ def runCMAe(folders, model, optSet, projMan, nbevals):
                       optSet.upper, optSet.x0, deb)
     affichParamLimits(optSet.synFRParName, optSet.lower,
                       optSet.upper, optSet.x0, deb)
+
+    titres1 = ["simN°"]
+    titres2 = ["simN°"]
+    for st in optSet.allPhasesStim[0][0]:
+        for parName in optSet.seriesStimParam:
+            titres1.append(optSet.stimName[st])
+            titres2.append(parName)
+    for sy in optSet.allPhasesSynFR[0][0]:
+        for parName in optSet.seriesSynFRParam:
+            titres1.append(optSet.connexFRName[sy])
+            titres2.append(parName)
+
+    writeBestResSuite(folders, "CMAeXValues.txt", titres1, 0)
+    writeBestResSuite(folders, "CMAeXValues.txt", titres2, 0)
+    writeBestResSuite(folders, "CMAeRealValues.txt", titres1, 0)
+    writeBestResSuite(folders, "CMAeRealValues.txt", titres2, 0)
     ##################################################
     [res, simSet] = improve(nbevals, adj_cmaes_sigma)
     ##################################################
