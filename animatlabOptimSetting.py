@@ -4,23 +4,20 @@ version 17
 Created on Wed Mar 01 10:25:16 2017
 Class that contains all parameters, stimuli and synapses for optimization
 @author: cattaert
-Modified by cattaert June 08 2017
-     Disabled list of synapses corrected line 492 & line 510
 
-Modified by cattaert September 1, 2017:
-    added handling of motorStims (self.motorStimuli, self.nbmotors,
-    self.tab_motors)(in progress)
-Modified September 21, 2017 (D; Cattaert)
-    self.folders created to allow its use in "actualizeparamLoeb" procedure
-    now the template is saved in the "finalModel" folder
-modified November 03, 2017 (D.Cataert):
-    A distinction is now made between self.synList (connexions to
-    be modified by optimization processes and self.synsTot (that concerns all
-    connexions)
+modified May 17, 2018 (D. Cataert):
+    The calculation of lines in chart for start1, end1, start2 and end2 have
+    been placed after the actualisation from pkl file in actualizeparamLoeb()
+modified June 26, 2018 (D. Cattaert):
+    self.seuilMSETyp = "Var". This new variable allows automatic threshold
+    for CMAE save chart.
+modified July 02, 2018 (D. Cattaert):
+    Other behaviour elements are stored in a nex list: "self.behavs"
 """
 
 import random
 from math import pi
+import numpy as np
 import class_animatLabModel as AnimatLabModel
 import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
@@ -239,6 +236,8 @@ class OptimizeSimSettings():
         self.multSynCoeff = 1.5
         self.maxMultSyn = 50
         self.coactivityFactor = 1000.0
+        self.xCoactPenality1 = 100.0
+        self.xCoactPenality2 = 1.0
         self.activThr = -0.06
         self.maxStim = 2e-08
         self.maxSynAmp = 50.0
@@ -290,20 +289,33 @@ class OptimizeSimSettings():
         self.allPhasesSyn = [self.totalsyn]
         self.allPhasesSynFR = [self.totalsynFR]
 
-        # CMAe parameters
+        # CMAes parameters
         self.seuilMSEsave = 100
         self.x0, self.realx0 = [], []
         self.lower, self.upper = [], []
         self.reallower, self.realupper = [], []
         self.stimParName = []
         self.synParName = []
+        self.synNSParName = []
         self.synFRParName = []
+        self.stimMin = []
         self.stimMax = []
+        self.synMin = []
         self.synMax = []
+        self.realxMin = []
+        self.realxMax = []
         self.cmaes_sigma = 0.0035
         self.fourchetteStim = 5.0
         self.fourchetteSyn = 5.0
         self.stimName = []
+        self.nbevals = 100
+        self.fromAsim = 0
+        self.pairs = np.array([])
+        self.behavs = np.array([])
+        self.nbMaxPairs = 10000
+        self.ideal_behav = [0, 0]
+        self.seuilMSETyp = "Var"
+        self.datastructure = {}
         for i in range(len(self.tab_stims)):
             self.stimName.append(self.tab_stims[i][0])
         self.motorName = []
@@ -404,13 +416,6 @@ class OptimizeSimSettings():
             find("CollectInterval").text
         self.rateAsim = int(1/float(self.collectInterval))
         self.rate = self.rateAsim
-        # calculates the chart lines corresponding to time events
-        self.lineStart1 = int((self.startEQM-self.chartStart)*self.rate)
-        self.lineEnd1 = int((self.endPos1-self.chartStart)*self.rate)
-        self.lineStart2 = int((self.endMvt2-self.chartStart)*self.rate)
-        self.lineEnd2 = int((self.endEQM-self.chartStart)*self.rate)
-        self.lineStartTot = int((self.startEQM-self.chartStart)*self.rate)
-        self.lineEndTot = int((self.endEQM-self.chartStart)*self.rate)
         self.mvtcolumn = self.paramOpt['mvtcolumn']
         self.mvtColChartName.append(self.chartColNames[self.mvtcolumn])
         self.startMvt1 = self.paramOpt['startMvt1']
@@ -424,6 +429,19 @@ class OptimizeSimSettings():
         self.startEQM = self.paramOpt['startEQM']
         self.endEQM = self.paramOpt['endEQM']
         self.allstim = self.paramOpt['allstim']
+        # calculates the chart lines corresponding to time events
+        self.lineStart1 = int((self.startEQM-self.chartStart)*self.rate)
+        self.lineEnd1 = int((self.endPos1-self.chartStart)*self.rate)
+        self.lineStart2 = int((self.endMvt2-self.chartStart)*self.rate)
+        self.lineEnd2 = int((self.endEQM-self.chartStart)*self.rate)
+        self.lineStartTot = int((self.startEQM-self.chartStart)*self.rate)
+        self.lineEndTot = int((self.endEQM-self.chartStart)*self.rate)
+        print "optSet.chartStart=", self.chartStart, "\t",
+        print "optSet.lineStart1=", self.lineStart1,
+        print "optSet.lineEnd1=", self.lineEnd1,
+        print "optSet.lineStart2=", self.lineStart2,
+        print "optSet.lineEnd2=", self.lineEnd2,
+
         # self.allsyn = self.paramOpt['allsyn']
         print "   #################################"
         print "   chart File : ", self.chartName[self.selectedChart]
@@ -581,14 +599,27 @@ class OptimizeSimSettings():
         self.cmaes_sigma = self.paramOpt['cmaes_sigma']
         self.fourchetteStim = self.paramOpt['fourchetteStim']
         self.fourchetteSyn = self.paramOpt['fourchetteSyn']
-        self.x0, self.realx0 = [], []
+        self.actualizeparamCMAes(realx0=[])
+
+    def actualizeparamCMAes(self, realx0=[]):
+        self.x0 = []
+        self.realx0 = realx0
         self.lower, self.upper = [], []
         self.reallower, self.realupper = [], []
         self.stimParName = []
         self.synParName = []
+        self.synNSParName = []
         self.synFRParName = []
+        self.stimMin = []
         self.stimMax = []
+        self.synMin = []
         self.synMax = []
+        self.realxMin = []
+        self.realxMax = []
+        if realx0 == []:
+            self.fromAsim = 1
+        else:
+            self.fromAsim = 0
         # ################################################################
         #                   ATTENTION !!!
         for phase in range(len(self.allPhasesStim)):
@@ -597,157 +628,248 @@ class OptimizeSimSettings():
              self.template] = self.allPhasesStim[phase]
         # here we use only onse phase => phase = 0
         # ################################################################
+        if self.fromAsim:
+            print "stim from asim:"
+        else:
+            print "stim from realx0:"
         for param in range(len(self.seriesStimParam)):
             paramName = self.seriesStimParam[param]
             if paramName == "StartTime":
                 for stim in range(len(listSt)):
                     stimMax = self.endPos2
-                    stimMin = 0
-                    self.stimMax.append(stimMax)
-                    realx0 = self.tab_stims[listSt[stim]][1]
-                    self.realx0.append(realx0)
-                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                    stimMin = 0.
+                    self.realxMax.append(stimMax)
+                    self.realxMin.append(stimMin)
+                    if self.fromAsim:
+                        rx0 = self.tab_stims[listSt[stim]][1]
+                        self.realx0.append(rx0)
+                    else:
+                        rx0 = self.realx0[stim]
+                    realdelta = float(stimMax - stimMin) * self.fourchetteStim\
                         / 100
-                    reallower = max((realx0 - delta), stimMin)
+                    reallower = max((rx0 - realdelta), stimMin)
                     self.reallower.append(reallower)
-                    realupper = min((realx0 + delta), stimMax)
+                    realupper = min((rx0 + realdelta), stimMax)
                     self.realupper.append(realupper)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.upper.append(1)
-                    self.lower.append(0)
-                    self.x0.append((realx0-reallower)/(realupper-reallower))
+                    temp = self.tab_stims[listSt[stim]][0] + "." + paramName
+                    self.stimParName.append(temp)
+                    print temp, rx0
+                    # self.upper.append(1.)
+                    # self.lower.append(0.)
+                    x0 = (rx0-stimMin)/(stimMax-stimMin)
+                    self.x0.append(x0)
+                    delta = self.fourchetteStim / 100
+                    lower = max((x0 - delta), 0)
+                    self.lower.append(lower)
+                    upper = min((x0 + delta), 1)
+                    self.upper.append(upper)
+
             elif paramName == "EndTime":
                 for stim in range(len(listSt)):
                     stimMax = self.endPos2
-                    stimMin = 0
-                    self.stimMax.append(stimMax)
-                    realx0 = self.tab_stims[listSt[stim]][2]
-                    self.realx0.append(realx0)
-                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                    stimMin = 0.
+                    self.realxMax.append(stimMax)
+                    self.realxMin.append(stimMin)
+                    if self.fromAsim:
+                        rx0 = self.tab_stims[listSt[stim]][2]
+                        self.realx0.append(rx0)
+                    else:
+                        rx0 = self.realx0[stim]
+                    realdelta = float(stimMax - stimMin) * self.fourchetteStim\
                         / 100
-                    reallower = max((realx0 - delta), stimMin)
+                    reallower = max((rx0 - realdelta), stimMin)
                     self.reallower.append(reallower)
-                    realupper = min((realx0 + delta), stimMax)
+                    realupper = min((rx0 + realdelta), stimMax)
                     self.realupper.append(realupper)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.upper.append(1)
-                    self.lower.append(0)
-                    self.x0.append((realx0-reallower)/(realupper-reallower))
+                    temp = self.tab_stims[listSt[stim]][0] + "." + paramName
+                    self.stimParName.append(temp)
+                    print temp, rx0
+                    # self.upper.append(1.)
+                    # self.lower.append(0.)
+                    x0 = (rx0-stimMin)/(stimMax-stimMin)
+                    self.x0.append(x0)
+                    delta = self.fourchetteStim / 100
+                    lower = max((x0 - delta), 0)
+                    self.lower.append(lower)
+                    upper = min((x0 + delta), 1)
+                    self.upper.append(upper)
+
             elif paramName == "CurrentOn":
                 for stim in range(len(listSt)):
                     stimMax = self.maxStim
                     stimMin = - stimMax
-                    self.stimMax.append(stimMax)
-                    realx0 = self.tab_stims[listSt[stim]][3]
-                    self.realx0.append(realx0)
-                    delta = float(stimMax - stimMin) * self.fourchetteStim\
+                    self.realxMax.append(stimMax)
+                    self.realxMin.append(stimMin)
+                    if self.fromAsim:
+                        rx0 = self.tab_stims[listSt[stim]][3]
+                        self.realx0.append(rx0)
+                    else:
+                        rx0 = self.realx0[stim]
+                    realdelta = float(stimMax - stimMin) * self.fourchetteStim\
                         / 100
-                    reallower = max((realx0 - delta), stimMin)
+                    reallower = max((rx0 - realdelta), stimMin)
                     self.reallower.append(reallower)
-                    realupper = min((realx0 + delta), stimMax)
+                    realupper = min((rx0 + realdelta), stimMax)
                     self.realupper.append(realupper)
-                    self.stimParName.append(self.
-                                            tab_stims[listSt[stim]][0] + "." +
-                                            paramName)
-                    self.upper.append(1)
-                    self.lower.append(0)
-                    self.x0.append((realx0-reallower)/(realupper-reallower))
+                    temp = self.tab_stims[listSt[stim]][0] + "." + paramName
+                    self.stimParName.append(temp)
+                    print temp, rx0
+                    # self.upper.append(1.)
+                    # self.lower.append(0.)
+                    x0 = (rx0-stimMin)/(stimMax-stimMin)
+                    self.x0.append(x0)
+                    delta = self.fourchetteStim / 100
+                    lower = max((x0 - delta), 0)
+                    self.lower.append(lower)
+                    upper = min((x0 + delta), 1)
+                    self.upper.append(upper)
 
+        deb = len(self.stimParName)
         for synparam in range(len(self.seriesSynParam)):
             synparamName = self.seriesSynParam[synparam]
             if synparamName == 'G':
                 if self.tab_connexions != []:
                     firstConnexion = findFirstType(self.model, "Connexions")
-                    for syn in range(len(self.synList)):
+                    if self.fromAsim:
+                        print "syn from asim:"
+                    else:
+                        print "syn from realx0:"
+                    for idx, syn in enumerate(self.synList):
                         if self.tab_connexions[syn][5] == 'SpikingChemical':
-                            rg = self.synList[syn] + firstConnexion
+                            rg = syn + firstConnexion
                             temp = self.model.lookup["Name"][rg] +\
                                 "." + synparamName
                             self.synParName.append(temp)
                             synMax = self.maxG
-                            synMin = 0
-                            self.synMax.append(synMax)
-                            realx0 = self.tab_connexions[self.synList[syn]][3]
-                            self.realx0.append(realx0)
-                            delta = float(synMax - synMin) *\
+                            synMin = 0.
+                            self.realxMax.append(synMax)
+                            self.realxMin.append(synMin)
+                            if self.fromAsim:
+                                rx0 = self.tab_connexions[syn][3]
+                                self.realx0.append(rx0)
+                            else:
+                                rx0 = self.realx0[deb + idx]
+                            realdelta = float(synMax - synMin) *\
                                 self.fourchetteSyn / 100
-                            reallower = max((realx0 - delta), synMin)
+                            reallower = max((rx0 - realdelta), synMin)
                             self.reallower.append(reallower)
-                            realupper = min((realx0 + delta), synMax)
+                            realupper = min((rx0 + realdelta), synMax)
                             self.realupper.append(realupper)
-                            self.upper.append(1)
-                            self.lower.append(0)
-                            self.x0.append((realx0-reallower) /
-                                           (realupper-reallower))
+                            # self.upper.append(1.)
+                            # self.lower.append(0.)
+                            x0 = (rx0-synMin)/(synMax-synMin)
+                            self.x0.append(x0)
+                            delta = self.fourchetteSyn / 100
+                            lower = max((x0 - delta), 0)
+                            self.lower.append(lower)
+                            upper = min((x0 + delta), 1)
+                            self.upper.append(upper)
 
+        deb = len(self.stimParName) + len(self.synParName)
         for synparam in range(len(self.seriesSynNSParam)):
             synparamName = self.seriesSynNSParam[synparam]
             if synparamName == 'SynAmp':
                 if self.tab_connexions != []:
-                    if self.tab_connexions[syn][5] == 'NonSpikingChemical':
-                        synMax = self.maxSynAmp
-                        tabvalrealsynxO = []
-                        for syn in self.synList:
-                            realx0 = self.tab_connexions[syn][1]
-                            tabvalrealsynxO.append(realx0)
+                    tabvalrealsynxO = []
+                    if self.fromAsim:
+                        print "synNS from asim:"
+                    else:
+                        print "synNS from realx0:"
+                    for idx, syn in enumerate(self.synList):
+                        # print self.tab_connexions[syn][5],
+                        if self.tab_connexions[syn][5] == 'NonSpikingChemical':
+                            synMax = self.maxSynAmp
+                            rx0 = self.tab_connexions[syn][1]
+                            # print rx0
+                            tabvalrealsynxO.append(rx0)
                         maxval = max(tabvalrealsynxO)
                         if maxval > synMax:
                                 synMax = maxval
                                 self.maxSynAmp = maxval
                                 print "WARNING: SynAmp larger than synMax..."
-                        for syn in self.synList:
-                            synapseTempID = self.Connexions[syn].\
-                                find("SynapseTypeID").text
-                            synapseTempName = self.model.\
-                                getElementByID(synapseTempID).\
-                                find("Name").text
-                            temp = synapseTempName + "." + synparamName
-                            self.synParName.append(temp)
-                            synMin = 0
-                            self.synMax.append(synMax)
-                            realx0 = self.tab_connexions[syn][1]
-                            self.realx0.append(realx0)
-                            delta = float(synMax - synMin) *\
-                                self.fourchetteSyn / 100
-                            reallower = max((realx0 - delta), synMin)
-                            self.reallower.append(reallower)
-                            realupper = min((realx0 + delta), synMax)
-                            self.realupper.append(realupper)
-                            self.upper.append(1)
-                            self.lower.append(0)
-                            self.x0.append((realx0-reallower) /
-                                           (realupper-reallower))
+                    for idx, syn in enumerate(self.synList):
+                        synapseTempID = self.Connexions[syn].\
+                            find("SynapseTypeID").text
+                        synapseTempName = self.model.\
+                            getElementByID(synapseTempID).\
+                            find("Name").text
+                        temp = synapseTempName + "." + synparamName
+                        print self.tab_connexions[syn][5],
+                        print temp,
+                        self.synNSParName.append(temp)
+                        synMin = 0.
+                        self.realxMax.append(synMax)
+                        self.realxMin.append(synMin)
+                        if self.fromAsim:
+                            rx0 = self.tab_connexions[syn][1]
+                            self.realx0.append(rx0)
+                        else:
+                            rx0 = self.realx0[deb + idx]
+                        print rx0
+                        realdelta = float(synMax - synMin) *\
+                            self.fourchetteSyn / 100
+                        reallower = max((rx0 - realdelta), synMin)
+                        self.reallower.append(reallower)
+                        realupper = min((rx0 + realdelta), synMax)
+                        self.realupper.append(realupper)
+                        # self.upper.append(1.)
+                        # self.lower.append(0.)
+                        x0 = (rx0-synMin)/(synMax-synMin)
+                        self.x0.append(x0)
+                        delta = self.fourchetteSyn / 100
+                        lower = max((x0 - delta), 0)
+                        self.lower.append(lower)
+                        upper = min((x0 + delta), 1)
+                        self.upper.append(upper)
 
+        deb = len(self.stimParName) + len(self.synParName) +\
+        len(self.synNSParName)
         for synparam in range(len(self.seriesSynFRParam)):
             synparamName = self.seriesSynFRParam[synparam]
             if synparamName == "Weight":
                 if self.tab_connexionsFR != []:
                     firstConnexion = findFirstType(self.model, "SynapsesFR")
-                    for synFR in range(len(self.synListFR)):
-                        rg = self.synListFR[synFR] + firstConnexion
+                    if self.fromAsim:
+                        print "synFR from asim:"
+                    else:
+                        print "synFR from realx0:"
+                    for idx, synFR in enumerate(self.synListFR):
+                        rg = self.synListFR[idx] + firstConnexion
                         temp = self.model.lookup["Name"][rg] +\
                             "." + synparamName
+                        # print self.tab_connexions[syn][5],
+                        print temp,
                         self.synFRParName.append(temp)
-                        synMax = self.maxWeight
-                        synMin = 0
-                        self.synMax.append(synMax)
-                        realx0 = self.tab_connexionsFR[self.
-                                                       synListFR[synFR]][1]
-                        self.realx0.append(realx0)
-                        delta = float(synMax - synMin) *\
+                        if self.fromAsim:
+                            rx0 = self.tab_connexionsFR[synFR][1]
+                            self.realx0.append(rx0)
+                        else:
+                            rx0 = self.realx0[deb + idx]
+                        print rx0
+                        if rx0 >= 0:
+                            synMax = self.maxWeight
+                            synMin = 0.
+                        else:
+                            synMax = 0.
+                            synMin = -self.maxWeight
+                        self.realxMax.append(synMax)
+                        self.realxMin.append(synMin)
+                        realdelta = float(synMax - synMin) *\
                             self.fourchetteSyn / 100
-                        reallower = max((realx0 - delta), synMin)
+                        reallower = max((rx0 - realdelta), synMin)
                         self.reallower.append(reallower)
-                        realupper = min((realx0 + delta), synMax)
+                        realupper = min((rx0 + realdelta), synMax)
                         self.realupper.append(realupper)
-                        self.upper.append(1)
-                        self.lower.append(0)
-                        self.x0.append((realx0-reallower) /
-                                       (realupper-reallower))
+                        # self.upper.append(1.)
+                        # self.lower.append(0.)
+                        x0 = (rx0-synMin)/(synMax-synMin)
+                        self.x0.append(x0)
+                        delta = self.fourchetteSyn / 100
+                        lower = max((x0 - delta), 0)
+                        self.lower.append(lower)
+                        upper = min((x0 + delta), 1)
+                        self.upper.append(upper)
+        print self.realx0
 
     def update_optSetParamLoeb(self):
         """

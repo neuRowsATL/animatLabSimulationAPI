@@ -61,6 +61,9 @@ Modified August 28,2017 (D. Cattaert):
 Modified December 04, 2017 (D. Cattaert):
     Two new button added to modifiy the path of skeleton elements in the aproj
     file ("Mesh Path" and "SaveNewAproj").
+Modified January 29, 2018 (D. Cattaert):
+    Bug fixed in Change Mesh function. Now does not requires a asim file to be
+    present in the directory
 @author: cattaert
 """
 
@@ -87,15 +90,19 @@ from PyQt5.QtWidgets import (QDialog, QWidget, QMessageBox,
 #                              QGridLayout, QInputDialog, QLabel, QLineEdit,
 #                              QMessageBox, QPushButton)
 
+from DialogChoose_in_List import ChooseInList
 
 import class_animatLabModel as AnimatLabModel
 import class_projectManager as ProjectManager
 import class_animatLabSimulationRunner as AnimatLabSimRunner
 from animatlabOptimSetting import OptimizeSimSettings
+from optimization import copyFile, copyFileDir
 import glob
 import xml.etree.ElementTree as elementTree
 from FoldersArm import FolderOrg
 # folders = FolderOrg()
+global verbose
+verbose = 1
 
 try:
     _encoding = QtWidgets.QApplication.UnicodeUTF8
@@ -138,7 +145,9 @@ def readAnimatLabV2ProgDir():
         fic = open(filename, 'r')
         directory = fic.readline()
         fic.close()
-    except:
+    except Exception as e:
+        if (verbose > 1):
+            print e
         directory = ""
     # print "First instance: Root directory will be created from GUI"
     return directory
@@ -150,20 +159,34 @@ def readAnimatLabSimDir():
         fic = open(filename, 'r')
         directory = fic.readline()
         fic.close()
-    except:
+    except Exception as e:
+        if (verbose > 1):
+            print e
         directory = ""
     # print "First instance: Root directory will be created from GUI"
     return directory
 
 
 def chooseChart(optSet):
-    dicItems = {"selectedChart": optSet.chartName[0]}
+    listDicItems = [{"selectedChart": [optSet.chartName[0]]}]
+    titleText = "Choose a chart"
+    rep = ChooseInList.listTransmit(parent=None,
+                                    graphNo=0,
+                                    listChoix=["selectedChart"],
+                                    items=optSet.chartName,
+                                    listDicItems=listDicItems,
+                                    onePerCol=[1],
+                                    colNames=["chart"],
+                                    typ="chk",
+                                    titleText=titleText)
+    """
     rep = GetList.listTransmit(parent=None,
                                listChoix=["selectedChart"],
                                items=optSet.chartName,
                                dicItems=dicItems,
                                titleText="Choose the chart for measurements")
-    return rep
+    """
+    return rep[0]
 
 
 class GetList(QDialog):
@@ -349,9 +372,9 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.btnBrowse.setText(_translate("MainWindow", "Pick a Folder", None))
         self.btnBrowse.setFont(self.font)
         self.btnMeshPath.setText(_translate("MainWindow",
-                                            "Mesh Path", None))
+                                            "Change Mesh Path", None))
         self.btnMeshPath.setFont(self.font)
-        self.btnMeshPath.setEnabled(False)
+        self.btnMeshPath.setEnabled(True)
         self.btnSaveAproj.setFont(self.font)
         self.btnSaveAproj.setEnabled(False)
         self.btnActualize.setText(_translate("MainWindow", "Actualize", None))
@@ -410,7 +433,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     print "paramOpt :"
                     self.optSet.printParams(self.optSet.paramLoebName,
                                             self.optSet.paramLoebValue)
-                    # self.saveparamFile()
                 print "paramMarquez :"
                 self.optSet.printParams(self.optSet.paramMarquezName,
                                         self.optSet.paramMarquezValue)
@@ -436,7 +458,9 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             else:
                 print "Mismatch between existing and actual parameter files"
                 response = False
-        except:
+        except Exception as e:
+            if (verbose > 1):
+                print e
             print "No parameter file with this name in the directory"
             print "NEEDs to create a new parameter file"
             response = False
@@ -454,6 +478,11 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         """
         aprojFileName = os.path.split(self.model.aprojFile)[-1]
         aprojSaveDir = self.folders.animatlab_rootFolder + "AprojFiles/"
+        if not os.path.exists(aprojSaveDir):
+            os.makedirs(aprojSaveDir)
+            copyFileDir(self.animatsimdir,
+                        aprojSaveDir,
+                        copy_dir=0)
         self.model.saveXMLaproj(aprojSaveDir + aprojFileName)
 
     def saveparamFile(self):
@@ -512,8 +541,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         secondListNb = rep[1]
         self.optSet.paramOpt['dontChangeStimNbs'] = firstListNb
         self.optSet.paramOpt['disabledStimNbs'] = secondListNb
-        # print type(self.optSet.actualizeparamLoeb())
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeStimNbs']))
         itm2 = QtWidgets.\
@@ -532,7 +559,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         secondListNb = rep[1]
         self.optSet.paramOpt['dontChangeSynNbs'] = firstListNb
         self.optSet.paramOpt['disabledSynNbs'] = secondListNb
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynNbs']))
         itm2 = QtWidgets.\
@@ -552,7 +578,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         secondListNb = rep[1]
         self.optSet.paramOpt['dontChangeSynFRNbs'] = firstListNb
         self.optSet.paramOpt['disabledSynFRNbs'] = secondListNb
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['dontChangeSynFRNbs']))
         itm2 = QtWidgets.\
@@ -572,7 +597,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         secondListNb = rep[1]
         self.optSet.paramMarquez['sensoryNeuronNbs'] = firstListNb
         self.optSet.paramMarquez['motorNeuronNbs'] = secondListNb
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramMarquez['sensoryNeuronNbs']))
         itm2 = QtWidgets.\
@@ -618,8 +642,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.optSet.paramMarquez['sensColChartNbs'] = firstListNb
         self.optSet.paramMarquez['mnColChartNbs'] = secondListNb
         self.optSet.paramOpt['mvtcolumn'] = thirdNb
-        # self.optSet.actualizeparamMarquez
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramMarquez['sensColChartNbs']))
         itm2 = QtWidgets.\
@@ -667,6 +689,22 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                         i += 1
             print "self.MNtoSt: ", self.MNtoSt
 
+# TODO:
+            """
+            listMNs = self.optSet.mnColChartNames
+            for MN in listMNs:
+                rep = ChooseInList.listTransmit(parent=None,
+                                                graphNo=0,
+                                                listChoix=listMNs,
+                                                items=self.optSet.stimName,
+                                                listDicItems=self.MNtoSt,
+                                                onePerCol=[1,1],
+                                                colNames=listMNs,
+                                                typ="chk",
+                                                titleText=MN)
+            self.listDicItems2 = rep[0][0]
+            """
+
             self.newMNtoSt = \
                 GetList.listTransmit(parent=None,
                                      listChoix=self.optSet.mnColChartNames,
@@ -706,7 +744,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         for i in firstListNb:
             listParamStim.append(self.optSet.stimParam[i])
         self.optSet.paramOpt['seriesStimParam'] = listParamStim
-        # self.optSet.actualizeparamLoeb
         itm1 = QtWidgets.\
             QTableWidgetItem(str(self.optSet.paramOpt['seriesStimParam']))
         self.tableWidget_7.setItem(15, 1, itm1)
@@ -857,8 +894,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             saveAnimatLabSimDir(dirname)
             self.dirname = dirname
             self.rootname = rootname
-            self.btnMeshPath.setEnabled(True)
-            self.btnSaveAproj.setEnabled(True)
             self.btnActualize.setEnabled(True)
             self.btnSave.setEnabled(True)
             # ################################################################
@@ -871,6 +906,10 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     sourceFiles=self.folders.python27_source_dir,
                     simFiles=self.folders.animatlab_simFiles_dir,
                     resultFiles=self.folders.animatlab_result_dir)
+            if len(glob.glob(os.path.join(
+                   self.folders.animatlab_commonFiles_dir, '*.asim'))) == 0:
+                print "No .asim file exist in directory"
+
             self.model = AnimatLabModel.\
                 AnimatLabModel(self.folders.animatlab_commonFiles_dir)
             self.projMan = ProjectManager.ProjectManager('Test Project')
@@ -979,8 +1018,6 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                                listparNameOpt):
                 print "parameter file found => reading params"
                 self.optSet.paramLoebCoul = listparCoulOpt
-                self.optSet.actualizeparamLoeb()
-                self.optSet.actualizeparamMarquez()
             else:
                 print "No parameter file found => default settings"
                 # If no parameter file found, then uses the default parameters
@@ -988,22 +1025,23 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                 self.optSet.paramLoebValue = listparValOpt
                 self.optSet.paramLoebType = listparTypeOpt
                 self.optSet.paramLoebCoul = listparCoulOpt
-                self.optSet.actualizeparamLoeb()
                 self.optSet.paramMarquezName = listparNameMarquez
                 self.optSet.paramMarquezValue = listparValMarquez
                 self.optSet.paramMarquezType = listparTypeMarquez
                 self.optSet.paramMarquezCoul = listparCoulMarquez
-                self.optSet.actualizeparamMarquez()
+            self.optSet.actualizeparamLoeb()
+            self.optSet.actualizeparamMarquez()
+
             if len(self.optSet.chartName) > 1:      # if more than one chart...
                 print self.optSet.chartName
                 previousChart = self.optSet.paramLoebValue[0]
                 chartNumber = {}
                 for idx, elem in enumerate(self.optSet.chartName):
                     chartNumber[elem] = idx
-                selectedDic = chooseChart(self.optSet)  # ... then select chart
+                listSelectedDic = chooseChart(self.optSet)  # then select chart
                 # chooseChart returns a dictionary...
                 # gets the chartName from the dictionary
-                selected = selectedDic['selectedChart']
+                selected = listSelectedDic[0]['selectedChart'][0]
                 # ... and gets its number
                 self.optSet.selectedChart = chartNumber[selected]
                 print "selected chart number :", self.optSet.selectedChart,
@@ -1327,13 +1365,63 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # nameLabel = QLabel(newMeshPath)
         # screen = MeshPathForm()
         # screen.show()
+        self.animatsimdir = readAnimatLabSimDir()
+        if self.animatsimdir != "":
+            subdir = os.path.split(self.animatsimdir)[-1]
+            rootname = os.path.dirname(self.animatsimdir)
+            rootname += "/"
+        else:
+            print "First instance - no previous animatlab folder selected"
+            rootname = ""
+        # mydir = "//Mac/Home/Documents/Labo/Scripts/AnimatLabV2/Human/test/"
+        # mydir = ""
+        dirname = QtWidgets.QFileDialog.getExistingDirectory(self,
+                                                             "Pick a folder",
+                                                             rootname)
+        # execute getExistingDirectory dialog and set the directory variable
+        #  to be equal to the user selected directory
 
-        newMeshPath = QtWidgets.QFileDialog.\
-             getExistingDirectory(self, "Mesh files Path", self.rootname)
-        print newMeshPath
-        meshPathTxt = convertPath2Text(newMeshPath)
-        changeMeshPath(self.folders, self.model, self.dirname, meshPathTxt)
+        if dirname:       # if user didn't pick a directory don't continue
+            print "You chose %s" % dirname
+            subdir = os.path.split(dirname)[-1]
+            print subdir
+            rootname = os.path.dirname(dirname)
+            rootname += "/"
+            self.folders = FolderOrg(animatlab_rootFolder=rootname,
+                                     subdir=subdir,
+                                     python27_source_dir=self.
+                                     animatLabV2ProgDir)
+            self.folders.affectDirectories()
 
+        self.newMeshPath = QtWidgets.QFileDialog.\
+            getExistingDirectory(self, "Mesh files Path", self.rootname)
+        print self.newMeshPath
+        meshPathTxt = convertPath2Text(self.newMeshPath)
+        res = changeMeshPath(self.folders, dirname, meshPathTxt)
+        aprojFile = res[0]
+        aprojtree = res[1]
+        # self.btnSaveAproj.setEnabled(True)
+
+        aprojFileName = os.path.split(aprojFile)[-1]
+        aprojSaveDir = self.folders.animatlab_rootFolder + "AprojFiles/"
+        if not os.path.exists(aprojSaveDir):
+            os.makedirs(aprojSaveDir)
+            copyFileDir(self.animatsimdir,
+                        aprojSaveDir,
+                        copy_dir=0)
+
+        fileName = aprojSaveDir + aprojFileName
+        saveDir = os.path.split(fileName)[0]
+        ficName = os.path.splitext(fileName)[0] + '*.aproj'
+        ix = len(glob.glob(os.path.join(saveDir, ficName)))
+        newname = os.path.splitext(fileName)[0] +\
+            '-{0:d}.aproj'.format(ix)
+        fileNameOK = os.path.join(saveDir, newname)
+
+        print 'Saving file: {}'.format(fileNameOK)
+        aprojtree.write(fileNameOK)
+
+        # self.model.saveXMLaproj(aprojSaveDir + aprojFileName)
 # ==========================================================================
 
 
@@ -1362,7 +1450,9 @@ def applyType(paramType, strTab):
                             val = int(listStr[rang])
                             listVal.append(val)
                         tab.append(listVal)
-                    except:
+                    except Exception as e:
+                        if (verbose > 1):
+                            print e
                         listVal = []
                         for rang in range(len(listStr)):
                             # print listStr[rang]
@@ -1425,7 +1515,7 @@ def convertPath2Text(meshPath):
     return txt
 
 
-def changeMeshPath(folders, model, aprojPath, newMeshPath):
+def changeMeshPath(folders, aprojPath, newMeshPath):
     sp = ""
 
     def changeDir(oldDir, newMeshPath, meshDir):
@@ -1442,14 +1532,19 @@ def changeMeshPath(folders, model, aprojPath, newMeshPath):
                 new = changeDir(meshpath, newMeshPath, "MaleSkeleton")
                 elt.find("MeshFile").text = new
                 print sp + new
-            except:
+            except Exception as e:
+                if (verbose > 1):
+                    print e
                 pass
             try:
                 cb = list(elt.find("ChildBodies"))
                 print sp + "childbodies found"
                 sp = sp + "\t"
                 findmesh(cb, sp)
-            except:
+            except Exception as e:
+                if (verbose > 1):
+                    print e
+                pass
                 pass
 
     folder = aprojPath
@@ -1484,6 +1579,7 @@ def changeMeshPath(folders, model, aprojPath, newMeshPath):
     for organism in organisms:
         print organism.find("Name").text
         findmesh(organism, sp)
+    return [aprojFile, aprojtree]
 
 
 def main():
