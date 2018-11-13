@@ -32,28 +32,30 @@ class FolderOrg():
     """
 
     """
-    def __init__(self, animatlab_rootFolder="", animatlab_commonFiles_dir="",
-                 animatlab_simFiles_dir="", animatlab_result_dir="",
-                 python27_source_dir="", subdir="montest"):
+    def __init__(self, animatlab_root="",
+                 python27_source_dir="",
+                 subdir="montest"):
         """
 
         """
-        self.animatlab_rootFolder = animatlab_rootFolder
-        self.animatlab_commonFiles_dir = animatlab_commonFiles_dir
-        self.animatlab_simFiles_dir = animatlab_simFiles_dir
-        self.animatlab_result_dir = animatlab_result_dir
-        self.subdir = subdir
+        foldername = subdir
+        self.animatlab_rootFolder = os.path.join(animatlab_root, foldername)
         self.python27_source_dir = python27_source_dir
+        self.subdir = subdir
+        self.animatlab_commonFiles_dir = ""
+        self.animatlab_simFiles_dir = ""
+        self.animatlab_result_dir = ""
 
     def affectDirectories(self):
         """
 
         """
-        foldername = self.subdir
-        self.animatlab_rootFolder += foldername + "/"
-        self.animatlab_commonFiles_dir=self.animatlab_rootFolder+"FinalModel/"
-        self.animatlab_simFiles_dir = self.animatlab_rootFolder + "SimFiles/"
-        self.animatlab_result_dir = self.animatlab_rootFolder + "ResultFiles/"
+        comdir = os.path.join(self.animatlab_rootFolder, "FinalModel/")
+        self.animatlab_commonFiles_dir = comdir
+        simdir = os.path.join(self.animatlab_rootFolder, "SimFiles/")
+        self.animatlab_simFiles_dir = simdir
+        resdir = os.path.join(self.animatlab_rootFolder, "ResultFiles/")
+        self.animatlab_result_dir = resdir
         # if self.python27_source_dir == "":
         #  self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"
         print self.animatlab_rootFolder

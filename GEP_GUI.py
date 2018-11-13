@@ -1401,6 +1401,7 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
             (closestBehav,
              closestDist, pairs_rg) = findClosestBehav(optSet.ideal_behav, 0)
             behav_obj = findRandObjective(closestDist, closestBehav, fourch)
+            print behav_obj
             self.pw_behav.plot(behav_obj[:, 0], behav_obj[:, 1], pen=None,
                                symbol='+', symbolBrush='y')
             # ==============================================================
@@ -1413,15 +1414,17 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
             paramserie = findNewParamSerie(behav_obj, nbNeighbours,
                                            sigma_fourch,
                                            len(optSet.x0), affich)
+            print paramserie
             if len(paramserie) > 0:
                 if len(self.dicConstParam) > 0:  # if constant parameters...
                     tmptab = []
-                    for idx, name in enumerate(self.parName):
+                    for index, name in enumerate(self.parName):
                         if name not in self.firstSelectedNames:
-                            tmptab.append(paramserie[0][idx])
+                            tmptab.append(paramserie[0][index])
                         else:
                             tmptab.append(self.dicConstParam[name])
                     paramserie = np.array(tmptab)
+                    paramserie.shape = (1, len(optSet.x0))
                 self.pw_param.plot(paramserie[:, parx], paramserie[:, pary],
                                    pen=3, symbol='o', symbolBrush='r')
                 self.plotOtherParam(paramserie,
@@ -1438,10 +1441,10 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
                     minMse = result[0][0][0]
                     minCoactP = result[0][0][1]
                     bestSimulNb = idx
-                    sourcedir = folders.animatlab_rootFolder +\
-                        "ResultFiles/"
-                    destdir = folders.animatlab_rootFolder +\
-                        "tmpGEPChartFiles/"
+                    sourcedir = os.path.join(folders.animatlab_rootFolder,
+                                             "ResultFiles")
+                    destdir = os.path.join(folders.animatlab_rootFolder,
+                                           "tmpGEPChartFiles")
                     filename = findTxtFileName(model, optSet, "", 1)
                     copyFile(filename, sourcedir, destdir)
                     print bestSimulNb, minErr, minMse, minCoactP
@@ -1459,7 +1462,8 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         # Saves the chart in CMAeSeuilChartFiles folder
         copyFile(filename, destdir, sourcedir)
         pre = ""
-        destdir = folders.animatlab_rootFolder + "GEPChartFiles/"
+        destdir = os.path.join(folders.animatlab_rootFolder,
+                               "GEPChartFiles")
         self.bestchart = tablo(folders.animatlab_result_dir,
                                findTxtFileName(model, optSet, pre, 1))
         txtchart = self.bestchart
@@ -1538,7 +1542,7 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         """
         folders = optSet.folders
         list_par = []
-        self.mydir = folders.animatlab_rootFolder + "GEPdata"
+        self.mydir = os.path.join(folders.animatlab_rootFolder, "GEPdata")
         if not os.path.exists(self.mydir):
             os.makedirs(self.mydir)
         onlyfiles = [f for f in listdir(self.mydir)
@@ -1618,7 +1622,8 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         the graphs
         """
         global folders, model, projMan, aprojFicName, optSet
-        self.mydir = folders.animatlab_rootFolder + "GEPdata"
+        self.mydir = os.path.join(folders.animatlab_rootFolder,
+                                  "GEPdata")
         options = QtGui.QFileDialog.Options()
         # options |= QFileDialog.DontUseNativeDialog
         fname, _ = QtGui.QFileDialog.\
@@ -1646,7 +1651,8 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
                 aprojFicName = res[4]
                 optSet = res[5]
                 self.initialiseParam()
-                self.mydir = folders.animatlab_rootFolder + "GEPdata"
+                self.mydir = os.path.join(folders.animatlab_rootFolder,
+                                          "GEPdata")
                 self.filename = fname
                 ficname = os.path.split(fname)[-1]
                 nomfic = os.path.splitext(ficname)[0] + ".txt"
@@ -1810,13 +1816,14 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
             for idx, chartFile in enumerate(chartList):
                 if typ == 'CMAE':
                     if chartFile[:-6] == 'CMAeMinChart':
-                        chartDir = folders.animatlab_rootFolder +\
-                            "CMAeMinChartFiles/"
+                        chartDir = os.path.join(folders.animatlab_rootFolder,
+                                                "CMAeMinChartFiles")
                     else:
-                        chartDir = folders.animatlab_rootFolder +\
-                            "CMAeSeuilChartFiles/"
+                        chartDir = os.path.join(folders.animatlab_rootFolder,
+                                                "CMAeSeuilChartFiles")
                 else:
-                    chartDir = folders.animatlab_rootFolder + "GEPChartFiles/"
+                    chartDir = os.path.join(folders.animatlab_rootFolder,
+                                            "GEPChartFiles")
                 chart = tablo(chartDir, chartFile)
                 self.plotmvt(chart)
                 # ==========================================================
@@ -1831,13 +1838,14 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
                 chartFile = chartList[rgMinErr]
                 if typ == 'CMAE':
                     if chartFile[:-6] == 'CMAeMinChart':
-                        chartDir = folders.animatlab_rootFolder +\
-                            "CMAeMinChartFiles/"
+                        chartDir = os.path.join(folders.animatlab_rootFolder,
+                                                "CMAeMinChartFiles")
                     else:
-                        chartDir = folders.animatlab_rootFolder +\
-                            "CMAeSeuilChartFiles/"
+                        chartDir = os.path.join(folders.animatlab_rootFolder,
+                                                "CMAeSeuilChartFiles")
                 else:
-                    chartDir = folders.animatlab_rootFolder + "GEPChartFiles/"
+                    chartDir = os.path.join(folders.animatlab_rootFolder,
+                                            "GEPChartFiles")
                 chart = tablo(chartDir, chartFile)
                 self.plotmvt(chart)
                 # ==========================================================
@@ -2038,8 +2046,10 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         model = optSet.model
         projMan = optSet.projMan
         simSet = SimulationSet.SimulationSet()
-        erase_folder_content(folders.animatlab_rootFolder + "SimFiles/")
-        sourcedir = folders.animatlab_rootFolder + "CMAeSeuilChartFiles/"
+        erase_folder_content(os.path.join(folders.animatlab_rootFolder,
+                                          "SimFiles"))
+        sourcedir = os.path.join(folders.animatlab_rootFolder,
+                                 "CMAeSeuilChartFiles")
         self.minErr = 10000.0
         self.minMse = 10000.0
         self.minCoactP = 10000000.0
@@ -2209,8 +2219,10 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         model = optSet.model
         projMan = optSet.projMan
         simSet = SimulationSet.SimulationSet()
-        erase_folder_content(folders.animatlab_rootFolder + "SimFiles/")
-        sourcedir = folders.animatlab_rootFolder + "CMAeSeuilChartFiles/"
+        erase_folder_content(os.path.join(folders.animatlab_rootFolder,
+                                          "SimFiles"))
+        sourcedir = os.path.join(folders.animatlab_rootFolder,
+                                 "CMAeSeuilChartFiles")
         self.minErr = 1000000.0
         self.minMse = 1000000.0
         self.minCoactP = 100000000.0
@@ -2422,7 +2434,8 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         print "    End of", self.simNb, "CMAE runs"
         print "==================================================="
         besterrList.append(self.minchartErr)
-        destdir = folders.animatlab_rootFolder + "CMAeMinChartFiles/"
+        destdir = os.path.join(folders.animatlab_rootFolder,
+                               "CMAeMinChartFiles")
         txtchart = self.minchart
         comment = "bestfit:" + str(self.minchartErr)
         chartname = savechartfile('CMAeMinChart', destdir, txtchart, comment)
@@ -2681,8 +2694,8 @@ def findNewParamSerie(behav_obj, nbNeighbours, sigma, nbpar, affich):
     # print optSet.pairs[order_series[0]][0:nbpar]
     if len(closestParamSet) > 0:
         # calculate new param set as mean of nbNeighbours closest paramsets
-        for idx in range(0, nbNeighbours):
-            newParamSet += optSet.pairs[order_series[idx]][0:nbpar]
+        for idex in range(0, nbNeighbours):
+            newParamSet += optSet.pairs[order_series[idex]][0:nbpar]
             print "=>", formatedparamset(newParamSet)
         newParamSet = newParamSet/nbNeighbours
         noiseset = np.random.random_sample((1, nbpar))
@@ -2692,11 +2705,11 @@ def findNewParamSerie(behav_obj, nbNeighbours, sigma, nbpar, affich):
         print " newParamSet:", formatedparamset(newParamSet)
         print "noiseset*sigma:", formatedparamset((noiseset * sigma)[0])
         print " paramserie:\t", formatedparamset(paramserie[0])
-        for idx in range(nbpar):
-            if paramserie[0][idx] > 1:
-                paramserie[0][idx] = 1
-            if paramserie[0][idx] < 0:
-                paramserie[0][idx] = 0
+        for idex in range(nbpar):
+            if paramserie[0][idex] > 1:
+                paramserie[0][idex] = 1
+            if paramserie[0][idex] < 0:
+                paramserie[0][idex] = 0
 
         # print newParamSet, "->", paramserie
     else:
@@ -2800,7 +2813,8 @@ def findRandObjective(closestDist, closestBehav, fourch):
 
 def runTrials(self, paramserie, savechart=0):
     # print "paramserie:", paramserie
-    erase_folder_content(folders.animatlab_rootFolder + "SimFiles/")
+    erase_folder_content(os.path.join(folders.animatlab_rootFolder,
+                                      "SimFiles"))
     behavRes = np.array(None)
     tabRes = []
     tabBehavElts = []
@@ -2864,8 +2878,9 @@ def runTrials(self, paramserie, savechart=0):
     if savechart:
         print "-----------------------------------"
         print bestSimulNb
-        # Saves the chart in CMAeSeuilChartFiles folder
-        destdir = folders.animatlab_rootFolder + "GEPChartFiles/"
+        # Saves the chart in GEPChartFile folder
+        destdir = os.path.join(folders.animatlab_rootFolder,
+                               "GEPChartFiles")
         self.bestchart = tablo(folders.animatlab_result_dir,
                                findTxtFileName(model, optSet,
                                                pre, bestSimulNb + 1))
@@ -2896,17 +2911,19 @@ def initAnimatLab(animatsimdir, animatLabV2ProgDir):
         print subdir
         rootdir = os.path.dirname(animatsimdir)
         rootdir += "/"
-        folders = FolderOrg(animatlab_rootFolder=rootdir,
+        folders = FolderOrg(animatlab_root=rootdir,
                             python27_source_dir=animatLabV2ProgDir,
                             subdir=subdir)
         folders.affectDirectories()
-        aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
+        aprojSaveDir = os.path.join(folders.animatlab_rootFolder,
+                                    "AprojFiles")
         if not os.path.exists(aprojSaveDir):
             os.makedirs(aprojSaveDir)
             copyFileDir(animatsimdir,
                         aprojSaveDir,
                         copy_dir=0)
-        aprojCMAeDir = folders.animatlab_rootFolder + "CMAeSeuilAprojFiles/"
+        aprojCMAeDir = os.path.join(folders.animatlab_rootFolder,
+                                    "CMAeSeuilAprojFiles")
         if not os.path.exists(aprojCMAeDir):
             os.makedirs(aprojCMAeDir)
             copyFileDir(animatsimdir,

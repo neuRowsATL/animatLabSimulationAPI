@@ -886,7 +886,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             print subdir
             rootname = os.path.dirname(dirname)
             rootname += "/"
-            self.folders = FolderOrg(animatlab_rootFolder=rootname,
+            self.folders = FolderOrg(animatlab_root=rootname,
                                      subdir=subdir,
                                      python27_source_dir=self.
                                      animatLabV2ProgDir)
@@ -1387,7 +1387,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             print subdir
             rootname = os.path.dirname(dirname)
             rootname += "/"
-            self.folders = FolderOrg(animatlab_rootFolder=rootname,
+            self.folders = FolderOrg(animatlab_root=rootname,
                                      subdir=subdir,
                                      python27_source_dir=self.
                                      animatLabV2ProgDir)

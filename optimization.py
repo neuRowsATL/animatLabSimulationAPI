@@ -622,7 +622,10 @@ def getValuesFromText(txt):
         t1 = t2[:t2.find('\t')]
         t2 = t2[t2.find('\t')+1:]
         xtab.append(t1)
-    t1 = t2[:t2.find('\n')]
+    if t2.find('\n') != -1:
+        t1 = t2[:t2.find('\n')]
+    else:
+        t1 = t2[:]
     xtab.append(t1)
     return xtab
 
@@ -1112,8 +1115,8 @@ def chargeBestSynValues(folders, model, filename, Connex,
 
 
 def copyFile(filename, src, dst):
-    sourcefile = src + filename
-    destfile = dst + filename
+    sourcefile = os.path.join(src, filename)
+    destfile = os.path.join(dst, filename)
     shutil.copy(sourcefile, destfile)
 
 
@@ -1142,7 +1145,7 @@ def copyRenameFile(sourcedir, filesource,
         ix = 0
         newName = rootName + '.asim'
     tgt = os.path.join(destdir, newName)
-    print "saving ", filesource, "to", destdir + newName
+    print "saving ", filesource, "to", os.path.join(destdir, newName)
     shutil.copyfile(src, tgt)
     return ix
 
@@ -1150,12 +1153,15 @@ def copyRenameFile(sourcedir, filesource,
 def copyDirectory(sourcedir, destdir):
     if not os.path.exists(destdir):
         os.makedirs(destdir)
-    # Copy filesource -> filedest
     for f in os.listdir(sourcedir):
         src = os.path.join(sourcedir, f)
         tgt = os.path.join(destdir, f)
         if os.path.isdir(src):
-            shutil.copytree(src, tgt)
+            try:
+                shutil.copytree(src, tgt)
+            except Exception as e:
+                if (verbose > 2):
+                    print e
         else:
             shutil.copy(src, tgt)
 
@@ -1821,7 +1827,8 @@ def improveStimparam(folders, model, optSet, projMan, simSet,
             # chartfile is saved only if there were an improvement
             comment = optSet.tab_stims[stimRank][0] + '\t' + paramName + '\t'\
                      'step:' + str(step) + '\t bestfit:' + str(bestfit)
-            destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
+            destdir = os.path.join(folders.animatlab_rootFolder,
+                                   "ChartResultFiles")
             chartname = savechartfile('mvtchartLoebStim',
                                       destdir, txtchart, comment)
             print "... chart file {} saved".format(chartname)
@@ -1968,7 +1975,8 @@ def improveSynparam(folders, model, optSet, projMan, simSet,
             comment = optSet.tab_connexions[synRank][0] + '\t' +\
                 paramSynName + '\t step:' + str(step) +\
                 '\t bestsynfit:' + str(bestsynfit)
-            destdir = folders.animatlab_rootFolder + "ChartResultFiles/"
+            destdir = os.path.join(folders.animatlab_rootFolder,
+                                   "ChartResultFiles")
             chartname = savechartfile('mvtchartLoebSyn',
                                       destdir, txtchart, comment)
             print "... chart file {} saved".format(chartname)
@@ -2567,7 +2575,7 @@ def actualiseSaveAprojFromAsimFileDir(optSet, model, asimsourcedir,
         nam = os.path.splitext(filesource)[0]
         numero = nam.split("-")[1]
         ficName = name + suffix + str(numero) + ext
-        aprojFileName = aprojdestdir + ficName
+        aprojFileName = os.path.join(aprojdestdir, ficName)
         actualiseSaveAprojFromAsimFile(optSet,
                                        asimFileName,
                                        aprojFileName,
@@ -2770,14 +2778,16 @@ def runSimMvt(folders, model, optSet, projMan,
         print
         print "-----------------------------------"
         # Saves the chart in CMAeSeuilChartFiles folder
-        destdir = folders.animatlab_rootFolder + "CMAeSeuilChartFiles/"
+        destdir = os.path.join(folders.animatlab_rootFolder,
+                               "CMAeSeuilChartFiles")
         txtchart = tab
         comment = "bestfit:" + str(err)
         chartname = savechartfile('CMAeSeuilChart', destdir, txtchart, comment)
         # print "... chart file {} saved; {}".format(chartname, comment)
         # Saves the .asim file with increment in CMAeSeuilAsimFiles folder
         simFileName = os.path.splitext(os.path.split(model.asimFile)[-1])[0]
-        destdir = folders.animatlab_rootFolder + "CMAeSeuilAsimFiles/"
+        destdir = os.path.join(folders.animatlab_rootFolder,
+                               "CMAeSeuilAsimFiles")
         sourcedir = folders.animatlab_simFiles_dir
         filesource = simFileName + "-1.asim"
         filedest = simFileName + ".asim"
@@ -2789,10 +2799,11 @@ def runSimMvt(folders, model, optSet, projMan,
         name = os.path.splitext(aprojFileName)[0]
         ext = os.path.splitext(aprojFileName)[1]
         ficname = name + "CMAeSeuil" + ext
-        aprojCMAeDir = folders.animatlab_rootFolder + "CMAeSeuilAprojFiles/"
+        aprojCMAeDir = os.path.join(folders.animatlab_rootFolder,
+                                    "CMAeSeuilAprojFiles")
         model.actualizeAprojStimState(optSet.tab_stims, affiche=0)
         model.actualizeAprojMotorState(optSet.tab_motors, affiche=0)
-        model.saveXMLaproj(aprojCMAeDir + ficname)
+        model.saveXMLaproj(os.path.join(aprojCMAeDir, ficname))
         print "-----------------------------------"
         comment = simFileName + '-{0:d}.asim'.format(numero)
         comment = comment + " " + chartname
@@ -2927,7 +2938,7 @@ def saveCMAEResults(optSet, simSet):
     # Copies asim file from "SimFiles" to "CMAeFinalSimFiles" folder
     model = optSet.model
     simFileName = os.path.splitext(os.path.split(model.asimFile)[-1])[0]
-    destdir = folders.animatlab_rootFolder + "CMAeBestSimFiles/"
+    destdir = os.path.join(folders.animatlab_rootFolder, "CMAeBestSimFiles")
     sourcedir = folders.animatlab_simFiles_dir
     filesource = simFileName + "-1.asim"
     filedest = simFileName + ".asim"
@@ -2942,9 +2953,9 @@ def saveCMAEResults(optSet, simSet):
     ext = os.path.splitext(aprojFicName)[1]
     ficName = name + "CMAeBest" + ext
 
-    aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
-    asimFileName = sourcedir + filesource
-    aprojFileName = aprojSaveDir + ficName
+    aprojSaveDir = os.path.join(folders.animatlab_rootFolder, "AprojFiles")
+    asimFileName = os.path.join(sourcedir, filesource)
+    aprojFileName = os.path.join(aprojSaveDir, ficName)
     complete_name = actualiseSaveAprojFromAsimFile(optSet,
                                                    asimFileName,
                                                    aprojFileName)
@@ -2953,7 +2964,7 @@ def saveCMAEResults(optSet, simSet):
 
     cwd = os.getcwd()
     CMAeDataSourceDir = cwd
-    CMAeDataDestDir = folders.animatlab_rootFolder + "CMAeData/"
+    CMAeDataDestDir = os.path.join(folders.animatlab_rootFolder, "CMAeData")
     CMAeDataSubDir = "CMAeData"
     destDir = createSubDirIncrem(CMAeDataDestDir, CMAeDataSubDir)
     dirname = os.path.basename(os.path.split(destDir)[0])
@@ -3077,7 +3088,7 @@ def runMarquez(folders, model, optSet, projMan):
     # simFileName = findChartName(folders.animatlab_commonFiles_dir)[0]+'.asim'
     simFileName = os.path.split(model.asimFile)[-1]
     sourceDir = folders.animatlab_commonFiles_dir
-    destDir = folders.animatlab_rootFolder + "temp/"
+    destDir = os.path.join(folders.animatlab_rootFolder, "temp")
     if not os.path.exists(destDir):
         os.makedirs(destDir)
     copyFile(simFileName, sourceDir, destDir)
@@ -3120,7 +3131,8 @@ def runMarquez(folders, model, optSet, projMan):
         projMan.run(cores=-1)
         optSet.ExternalStimuli[stimRank].find("Enabled").text = 'False'
         for amp in range(len(twitchAmpSet)):
-            twitchdir = folders.animatlab_rootFolder + "ChartTwitchFiles/"
+            twitchdir = os.path.join(folders.animatlab_rootFolder,
+                                     "ChartTwitchFiles")
             tableTmp.append(tablo(folders.animatlab_result_dir,
                                   findTxtFileName(model, optSet, "", amp+1)))
             stimtxt = '%2.2f' % (twitchAmpSet[amp] * 1e09)
@@ -3130,7 +3142,8 @@ def runMarquez(folders, model, optSet, projMan):
 
         print "\nsaving twitch asim File to FinalTwitchModel Directory"
         sourceDir = folders.animatlab_simFiles_dir
-        destDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+        destDir = os.path.join(folders.animatlab_rootFolder,
+                               "FinalTwitchModel")
         if not os.path.exists(destDir):
             os.makedirs(destDir)
         simTwitchFileNames = findList_asimFiles(sourceDir)
@@ -3196,6 +3209,6 @@ def runMarquez(folders, model, optSet, projMan):
                           optSet.sensColChartNbs)
 
     print "\ncopying original asim File back to FinalModel Directory"
-    sourceDir = folders.animatlab_rootFolder + "temp/"
+    sourceDir = os.path.join(folders.animatlab_rootFolder, "temp")
     destDir = folders.animatlab_commonFiles_dir
     copyFile(simFileName, sourceDir, destDir)

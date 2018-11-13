@@ -320,7 +320,7 @@ def makemvtsavechart(model, jointNb, motorName, val, motorStart, motorEnd):
     # simFileName=findChartName(folders.animatlab_commonFiles_dir)[0] + '.asim'
     simFileName = os.path.split(model.asimFile)[-1]
     sourceDir = folders.animatlab_commonFiles_dir
-    destDir = folders.animatlab_rootFolder + "temp/"
+    destDir = os.path.join(folders.animatlab_rootFolder, "temp")
     if not os.path.exists(destDir):
         os.makedirs(destDir)
     copyFile(simFileName, sourceDir, destDir)
@@ -359,13 +359,13 @@ def makemvtsavechart(model, jointNb, motorName, val, motorStart, motorEnd):
     # === copying asim File from FinalModel to MaxMvtModel Directory  ====
     print "\nCopying asim File from FinalModel to MaxMvtModel Directory"
     sourceDir = folders.animatlab_commonFiles_dir
-    destDir = folders.animatlab_rootFolder + "MaxMvtModel/"
+    destDir = os.path.join(folders.animatlab_rootFolder, "MaxMvtModel")
     if not os.path.exists(destDir):
         os.makedirs(destDir)
     copyFile(simFileName, sourceDir, destDir)
     # ===== copying original asim File back to FinalModel Directory  =====
     print "\ncopying original asim File back to FinalModel Directory"
-    sourceDir = folders.animatlab_rootFolder + "temp/"
+    sourceDir = os.path.join(folders.animatlab_rootFolder, "temp")
     destDir = folders.animatlab_commonFiles_dir
     copyFile(simFileName, sourceDir, destDir)
     return chartname
@@ -605,7 +605,7 @@ def changeparamvalue(model, paramName, paramType, value):
 
 def CMAeBestAprojFilesToAprojFiles(model):
     asimsourcedir = os.path.join(folders.animatlab_rootFolder,
-                                 "CMAeBestAprojFiles/")
+                                 "CMAeBestAprojFiles")
     aprojdestdir = aprojSaveDir
     suffix = "CMAeBest-"
     actualiseSaveAprojFromAsimFileDir(optSet, model, asimsourcedir,
@@ -614,9 +614,9 @@ def CMAeBestAprojFilesToAprojFiles(model):
 
 def CMAeSeuilAsimFilesToCMAeSeuilAprojFiles(model):
     asimsourcedir = os.path.join(folders.animatlab_rootFolder,
-                                 "CMAeSeuilAsimFiles/")
+                                 "CMAeSeuilAsimFiles")
     aprojdestdir = os.path.join(folders.animatlab_rootFolder,
-                                "CMAeSeuilAprojFiles/")
+                                "CMAeSeuilAprojFiles")
     suffix = "CMAeSeuil-"
     actualiseSaveAprojFromAsimFileDir(optSet, model, asimsourcedir,
                                       aprojdestdir, suffix)
@@ -634,15 +634,16 @@ def execMarquez(optSet):
     projMan = optSet.projMan
 
     runMarquez(folders, model, optSet, projMan)
-    sourceDir = folders.animatlab_rootFolder + "FinalTwitchModel/"
+    sourceDir = os.path.join(folders.animatlab_rootFolder, "FinalTwitchModel")
     asimFileNamesList = findList_asimFiles(sourceDir)
     if asimFileNamesList != []:
-        asimFileName = folders.animatlab_rootFolder +\
-            "FinalTwitchModel/" + asimFileNamesList[0]
+        asimFileName = os.path.join(folders.animatlab_rootFolder,
+                                    "FinalTwitchModel",
+                                    asimFileNamesList[0])
     name = os.path.splitext(aprojFicName)[0]
     ext = os.path.splitext(aprojFicName)[1]
     ficname = name + "Marquez" + ext
-    aprojFileName = aprojSaveDir + ficname
+    aprojFileName = os.path.join(aprojSaveDir, ficname)
     actualiseSaveAprojFromAsimFile(optSet, asimFileName, aprojFileName)
 
 
@@ -655,7 +656,8 @@ def initializeLoeb(folders):
     """
     global essai
     essai = 0
-    dirName = folders.animatlab_rootFolder + "ResultFiles/"
+    dirName = os.path.join(folders.animatlab_rootFolder,
+                           "ResultFiles")
 
 # TODO:
     # if os.path.exists(destDir):
@@ -678,7 +680,8 @@ def initializeLoeb(folders):
     if os.path.exists(dirName + "syncoeff.txt"):
         os.remove(dirName + "syncoeff.txt")
 
-    erase_folder_content(folders.animatlab_rootFolder + "SimFiles/")
+    erase_folder_content(os.path.join(folders.animatlab_rootFolder,
+                                      "SimFiles"))
 
 
 def findLastSavedFile(directory, ficname, ext):
@@ -796,7 +799,8 @@ def execLoeb(optSet):
     essai = essaiNb
     # ---------------------------------------------------------
     # Copies the bestfit .asim file in LoebLastSimFiles folder
-    destdir = folders.animatlab_rootFolder + "LoebLastSimFiles/"
+    destdir = os.path.join(folders.animatlab_rootFolder,
+                           "LoebLastSimFiles")
     sourcedir = folders.animatlab_commonFiles_dir
     simFileName = os.path.splitext(os.path.split(model.asimFile)[-1])[0]
     filesource = simFileName + ".asim"
@@ -916,7 +920,8 @@ def FinalModelfromCMAeSeuilAsimFiles(optSet, cmaeNb):
     # --------------------------------------------------------------------
     # Copies sim file from "CMAeBestSimFiles" to "FinalModel" folder
     destdir = folders.animatlab_commonFiles_dir
-    sourcedir = folders.animatlab_rootFolder + "CMAeSeuilAsimFiles/"
+    sourcedir = os.path.join(folders.animatlab_rootFolder,
+                             "CMAeSeuilAsimFiles")
     filesource = simFileName + "-" + str(cmaeNb) + ".asim"
     filedest = simFileName + ".asim"
     # Replaces the previous .asim File
@@ -1006,7 +1011,8 @@ def initialise(folders):
     checknonzeroExtStimuli(optSet)
     optSet.tab_stims = affichExtStim(optSet, optSet.ExternalStimuli, 1)
 
-    erase_folder_content(folders.animatlab_rootFolder + "SimFiles/")
+    erase_folder_content(os.path.join(folders.animatlab_rootFolder,
+                                      "SimFiles"))
 
 
 # ============================================================================
@@ -1023,17 +1029,19 @@ if __name__ == '__main__':
         print subdir
         rootname = os.path.dirname(animatsimdir)
         rootname += "/"
-        folders = FolderOrg(animatlab_rootFolder=rootname,
+        folders = FolderOrg(animatlab_root=rootname,
                             python27_source_dir=animatLabV2ProgDir,
                             subdir=subdir)
         folders.affectDirectories()
-        aprojSaveDir = folders.animatlab_rootFolder + "AprojFiles/"
+        aprojSaveDir = os.path.join(folders.animatlab_rootFolder,
+                                    "AprojFiles")
         if not os.path.exists(aprojSaveDir):
             os.makedirs(aprojSaveDir)
             copyFileDir(animatsimdir,
                         aprojSaveDir,
                         copy_dir=0)
-        aprojCMAeDir = folders.animatlab_rootFolder + "CMAeSeuilAprojFiles/"
+        aprojCMAeDir = os.path.join(folders.animatlab_rootFolder,
+                                    "CMAeSeuilAprojFiles")
         if not os.path.exists(aprojCMAeDir):
             os.makedirs(aprojCMAeDir)
             copyFileDir(animatsimdir,
