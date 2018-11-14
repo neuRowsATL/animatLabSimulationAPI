@@ -50,11 +50,11 @@ class FolderOrg():
         """
 
         """
-        comdir = os.path.join(self.animatlab_rootFolder, "FinalModel/")
+        comdir = os.path.join(self.animatlab_rootFolder, "FinalModel")
         self.animatlab_commonFiles_dir = comdir
-        simdir = os.path.join(self.animatlab_rootFolder, "SimFiles/")
+        simdir = os.path.join(self.animatlab_rootFolder, "SimFiles")
         self.animatlab_simFiles_dir = simdir
-        resdir = os.path.join(self.animatlab_rootFolder, "ResultFiles/")
+        resdir = os.path.join(self.animatlab_rootFolder, "ResultFiles")
         self.animatlab_result_dir = resdir
         # if self.python27_source_dir == "":
         #  self.python27_source_dir = "C:/Program Files (x86)/AnimatLab V2/bin"

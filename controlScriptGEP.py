@@ -224,7 +224,7 @@ def RunSeriesMvts(tabscript, newMvtline):
                         const = 'const_%2.3f-%2.3f' % (cval[0], cval[1])
                     readExecParam(tabscript, par, line)
                     line += 1
-                trasfertData(animatsimdir, savedatadir, angles, const)
+                transfertData(animatsimdir, savedatadir, angles, const)
 
             else:
                 print "angle1", angle1, "angle2", angle2
@@ -244,7 +244,7 @@ def RunSeriesMvts(tabscript, newMvtline):
                 sourcedir = animatsimdir
                 destdir = os.path.join(savedatadir, angles, const)
                 print sourcedir, "->", destdir
-                trasfertData(animatsimdir, savedatadir, angles, const)
+                transfertData(animatsimdir, savedatadir, angles, const)
 
         else:
             print "error /script file: should be 'angle <tab> 0 <tab> 80'"
@@ -263,7 +263,7 @@ def readExecParam(tabscript, par, line):
         SetsCMAEsParam(tabscript, line)
 
 
-def trasfertData(animatsimdir, savedatadir, angles, const):
+def transfertData(animatsimdir, savedatadir, angles, const):
     sourcedir = animatsimdir
     destdir = os.path.join(savedatadir, angles, const)
     print sourcedir, "->", destdir

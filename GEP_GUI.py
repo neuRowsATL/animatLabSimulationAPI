@@ -920,6 +920,7 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
         self.dicConstParam = {}
         self.listDicGraphs = [{"abscissa": self.parName[0],
                                "ordinate": self.parName[1]}]
+        self.mvtTemplate = np.array(optSet.mvtTemplate)
 
     def btngroup(self, btn):
         print btn.text() + " is selected"
@@ -1651,6 +1652,7 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
                 aprojFicName = res[4]
                 optSet = res[5]
                 self.initialiseParam()
+                self.clearmvt()
                 self.mydir = os.path.join(folders.animatlab_rootFolder,
                                           "GEPdata")
                 self.filename = fname
@@ -2285,6 +2287,7 @@ class MaFenetre(QtGui.QMainWindow, Ui_MainWindow):
             if len(result) > 5:     # if a chart was saved...
                 self.bestchartName = result[-1].split(" ")[-1]
                 bestchartList.append(self.bestchartName)
+                print self.bestchartName
                 err = result[1]
                 besterrList.append(err)
                 bestparamList.append(lastrun + self.simNb)
@@ -2910,7 +2913,7 @@ def initAnimatLab(animatsimdir, animatLabV2ProgDir):
         subdir = os.path.split(animatsimdir)[-1]
         print subdir
         rootdir = os.path.dirname(animatsimdir)
-        rootdir += "/"
+        # rootdir += "/"
         folders = FolderOrg(animatlab_root=rootdir,
                             python27_source_dir=animatLabV2ProgDir,
                             subdir=subdir)
@@ -2952,7 +2955,8 @@ def initAnimatLab(animatsimdir, animatLabV2ProgDir):
         setMotorStimsOff(model, optSet.motorStimuli)
         # Looks for a parameter file in the chosen directory
         fileName = 'paramOpt.pkl'
-        if loadParams(folders.animatlab_result_dir + fileName, optSet):
+        if loadParams(os.path.join(folders.animatlab_result_dir, fileName),
+                      optSet):
             # optSet was updated from "paramOpt.pkl"
             # we use then optSet to implement the needed variables
             # listparNameOpt = optSet.paramLoebName

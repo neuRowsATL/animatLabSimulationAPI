@@ -717,8 +717,8 @@ def tablo(directory, filename):
     return tabfinal
 
 
-def savecurve(table, folder, filename):
-    f = open(folder + filename, 'w')
+def savecurve(table, directory, filename):
+    f = open(os.path.join(directory, filename), 'w')
     for i in range(len(table)):
         s = (str(table[i][0]) + '\t' +
              str(table[i][1]) + '\t' +

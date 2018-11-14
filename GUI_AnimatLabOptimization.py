@@ -477,20 +477,22 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         doc string
         """
         aprojFileName = os.path.split(self.model.aprojFile)[-1]
-        aprojSaveDir = self.folders.animatlab_rootFolder + "AprojFiles/"
+        aprojSaveDir = os.path.join(self.folders.animatlab_rootFolder,
+                                    "AprojFiles")
         if not os.path.exists(aprojSaveDir):
             os.makedirs(aprojSaveDir)
             copyFileDir(self.animatsimdir,
                         aprojSaveDir,
                         copy_dir=0)
-        self.model.saveXMLaproj(aprojSaveDir + aprojFileName)
+        self.model.saveXMLaproj(os.path.join(aprojSaveDir, aprojFileName))
 
     def saveparamFile(self):
         """
         doc string
         """
         self.miseAjour()
-        saveParams(self.folders.animatlab_result_dir + 'paramOpt.pkl',
+        saveParams(os.path.join(self.folders.animatlab_result_dir,
+                                'paramOpt.pkl'),
                    self.optSet)
 
     def miseAjour(self):
@@ -868,7 +870,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         if self.animatsimdir != "":
             subdir = os.path.split(self.animatsimdir)[-1]
             rootname = os.path.dirname(self.animatsimdir)
-            rootname += "/"
+            # rootname += "/"
         else:
             print "First instance - no previous animatlab folder selected"
             rootname = ""
@@ -885,7 +887,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             subdir = os.path.split(dirname)[-1]
             print subdir
             rootname = os.path.dirname(dirname)
-            rootname += "/"
+            # rootname += "/"
             self.folders = FolderOrg(animatlab_root=rootname,
                                      subdir=subdir,
                                      python27_source_dir=self.
@@ -906,8 +908,9 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     sourceFiles=self.folders.python27_source_dir,
                     simFiles=self.folders.animatlab_simFiles_dir,
                     resultFiles=self.folders.animatlab_result_dir)
-            if len(glob.glob(os.path.join(
-                   self.folders.animatlab_commonFiles_dir, '*.asim'))) == 0:
+            asimdir= os.path.join(self.folders.animatlab_commonFiles_dir,
+                                  '*.asim')
+            if len(glob.glob(asimdir)) == 0:
                 print "No .asim file exist in directory"
 
             self.model = AnimatLabModel.\
@@ -1014,7 +1017,8 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             #       Looks for a parameter file in the chosen directory      #
             # ###############################################################
             fileName = 'paramOpt.pkl'
-            if self.loadParams(self.folders.animatlab_result_dir+fileName,
+            if self.loadParams(os.path.join(self.folders.animatlab_result_dir,
+                                            fileName),
                                listparNameOpt):
                 print "parameter file found => reading params"
                 self.optSet.paramLoebCoul = listparCoulOpt
@@ -1369,7 +1373,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         if self.animatsimdir != "":
             subdir = os.path.split(self.animatsimdir)[-1]
             rootname = os.path.dirname(self.animatsimdir)
-            rootname += "/"
+            # rootname += "/"
         else:
             print "First instance - no previous animatlab folder selected"
             rootname = ""
@@ -1386,7 +1390,7 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
             subdir = os.path.split(dirname)[-1]
             print subdir
             rootname = os.path.dirname(dirname)
-            rootname += "/"
+            # rootname += "/"
             self.folders = FolderOrg(animatlab_root=rootname,
                                      subdir=subdir,
                                      python27_source_dir=self.
@@ -1403,14 +1407,15 @@ class ReadAsimAform(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # self.btnSaveAproj.setEnabled(True)
 
         aprojFileName = os.path.split(aprojFile)[-1]
-        aprojSaveDir = self.folders.animatlab_rootFolder + "AprojFiles/"
+        aprojSaveDir = os.path.join(self.folders.animatlab_rootFolder,
+                                    "AprojFiles")
         if not os.path.exists(aprojSaveDir):
             os.makedirs(aprojSaveDir)
             copyFileDir(self.animatsimdir,
                         aprojSaveDir,
                         copy_dir=0)
 
-        fileName = aprojSaveDir + aprojFileName
+        fileName = os.path.join(aprojSaveDir, aprojFileName)
         saveDir = os.path.split(fileName)[0]
         ficName = os.path.splitext(fileName)[0] + '*.aproj'
         ix = len(glob.glob(os.path.join(saveDir, ficName)))
